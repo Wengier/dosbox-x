@@ -1,0 +1,1 @@
+#define GLIB_COMPILATION 1

@@ -124,6 +124,9 @@
     <Filter Include="Sources\cpu\core_dyn_x86">
       <UniqueIdentifier>{09ec76de-76b7-416f-9a14-f47a19aabc07}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Sources\libs\glib">
+      <UniqueIdentifier>{aafcbb18-c733-4172-9622-1b804900f0ed}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\aviwriter\avi_rw_iobuf.cpp">
@@ -1520,6 +1523,390 @@
     </ClCompile>
     <ClCompile Include="..\src\misc\savestates.cpp">
       <Filter>Sources\misc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gnulib\vasnprintf.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\textdomain.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gnulib\printf-parse.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gnulib\printf-args.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gnulib\printf.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\plural-exp.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\plural.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_xclass.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_version.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_valid_utf8.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_tables.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_study.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_string_utils.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_ord2utf8.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_newline.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_jit_compile.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_globals.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_get.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_fullinfo.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_exec.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_dfa_exec.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_config.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_compile.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_chartables.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\pcre\pcre_byte_order.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\log.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\localename.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\localealias.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libcharset\localcharset.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\loadmsgcat.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\langprefs.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\l10nflist.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\intl_printf.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gwin32.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gwakeup.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gversion.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gvarianttypeinfo.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gvarianttype.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gvariant-serialiser.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gvariant-parser.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gvariant-core.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gvariant.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gutils.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gutf8.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gurifuncs.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\guniprop.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gunidecomp.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gunicollate.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gunibreak.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gtree.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gtrashstack.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gtranslit.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gtimezone.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gtimer.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gthread-win32.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gthreadpool.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\deprecated\gthread-deprecated.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gthread.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gtestutils.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gstringchunk.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gstring.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gstrfuncs.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gstdio.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gspawn-win32.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gslist.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gslice.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gshell.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gsequence.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gscanner.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\deprecated\grel.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gregex.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\grand.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gqueue.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gquark.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gqsort.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gprintf.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gprimes.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gpoll.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gpattern.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\goption.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gnode.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gmessages.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gmem.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gmarkup.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gmappedfile.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gmain.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\glist.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\glib-private.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\glib-init.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gkeyfile.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\giowin32.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\giochannel.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\ghostutils.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\ghook.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\ghmac.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\ghash.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\ggettext.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gfileutils.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\gettext.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gerror.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\genviron.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gdir.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gdatetime.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gdate.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gdataset.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gconvert.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\deprecated\gcompletion.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gchecksum.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gcharset.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\deprecated\gcache.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gbytes.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gbookmarkfile.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gbitlock.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gbase64.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gbacktrace.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gatomic.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gasyncqueue.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\garray.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\deprecated\gallocator.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\finddomain.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\explodename.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\dngettext.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\dgettext.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\dcngettext.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\dcigettext.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\dcgettext.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\libintl\bindtextdom.c">
+      <Filter>Sources\libs\glib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\libs\glib\gnulib\asnprintf.c">
+      <Filter>Sources\libs\glib</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

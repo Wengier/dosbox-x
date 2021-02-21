@@ -32,6 +32,7 @@ int fluid_win32_create_window(void);
 void fluid_win32_destroy_window(void);
 HWND fluid_win32_get_window(void);
 
+#define FLUIDSYNTH_NOT_A_DLL
 #ifndef FLUIDSYNTH_NOT_A_DLL
 BOOL WINAPI DllMain(HANDLE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)
 {
