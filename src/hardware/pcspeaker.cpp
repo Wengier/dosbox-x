@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -706,7 +706,7 @@ public:
 	PCSPEAKER(Section* configuration):Module_base(configuration){
 		spkr.chan=0;
 		Section_prop * section=static_cast<Section_prop *>(configuration);
-		if(!section->Get_bool("pcspeaker")) return;
+		if(!section->Get_bool("pcspeaker")||control->opt_silent) return;
 		spkr.pit_output_enabled = 0;
 		spkr.pit_clock_gate_enabled = 0;
 		spkr.pit_mode1_waiting_for_trigger = 1;

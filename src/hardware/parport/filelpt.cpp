@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -140,13 +140,14 @@ void CFileLPT::doAction() {
                 char *p = bufput;
                 int count = bufct;
                 while (count-- > 1)
-                    if (*(p++) == 0x1b)
-                        if (*p == '@')												// <Esc>@ = Printer reset Epson
+                    if(*(p++) == 0x1b) {
+                        if(*p == '@')												// <Esc>@ = Printer reset Epson
                             break;
-                        else if (*p > 0x24 && *p < 0x2b && isalpha(*(p+1))) {
+                        else if(*p > 0x24 && *p < 0x2b && isalpha(*(p + 1))) {
                             isPCL = true;
                             break;
                         }
+                    }
             }
         }
         std::string action=action1.size()&&isPS?action1:(action2.size()&&isPCL?action2:action3);

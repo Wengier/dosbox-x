@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -20,17 +20,12 @@
 #ifndef DOSBOX_SHELL_H
 #define DOSBOX_SHELL_H
 
-#include <ctype.h>
 #ifndef DOSBOX_DOSBOX_H
 #include "dosbox.h"
 #endif
 #ifndef DOSBOX_PROGRAMS_H
 #include "programs.h"
 #endif
-
-#include <string>
-#include <list>
-#include <map>
 
 #include <SDL.h>
 #if SDL_VERSION_ATLEAST(2, 0, 0)
@@ -99,6 +94,7 @@ public:
 	DOS_Shell();
 	virtual ~DOS_Shell();
 
+	void Prepare(void);
     /*! \brief      Program entry point, when the command is run
      */
 	void Run(void);

@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -89,14 +89,18 @@ public:
 
 	CPrinter (uint16_t dpi, uint16_t width, uint16_t height, char* output, bool multipageOutput);
 	virtual ~CPrinter();
+	FT_Face curFont = NULL;					// The font currently used to render characters
 
 	void getPrinterContext();
 
 	// Process one character sent to virtual printer
-	void printChar(uint8_t ch);
+	void printChar(uint8_t ch, int box = -1);
 
 	// Hard Reset (like switching printer off and on)
 	void resetPrinterHard();
+
+	// Reload font. Must be called after changing dpi, style or cpi
+	void updateFont();
 
 	// Set Autofeed value 
 	void setAutofeed(bool feed);
@@ -128,9 +132,6 @@ private:
 
 	// Resets the printer to the factory settings
 	void resetPrinter();
-
-	// Reload font. Must be called after changing dpi, style or cpi
-	void updateFont();
 
 	// Clears page. If save is true, saves the current page to a bitmap
 	void newPage(bool save, bool resetx);
@@ -169,7 +170,6 @@ private:
 	FT_Library FTlib;					// FreeType2 library used to render the characters
 
 	SDL_Surface* page;					// Surface representing the current page
-	FT_Face curFont = NULL;					// The font currently used to render characters
 	uint8_t color = 0;
 
 	double curX = 0, curY = 0;					// Position of the print head (in inch)

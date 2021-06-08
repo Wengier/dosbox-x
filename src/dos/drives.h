@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -36,6 +36,7 @@ void Set_Label(char const * const input, char * const output, bool cdrom);
 class DriveManager {
 public:
 	static void AppendDisk(int drive, DOS_Drive* disk);
+	static void ChangeDisk(int drive, DOS_Drive* disk);
 	static void InitializeDrive(int drive);
 	static int UnmountDrive(int drive);
 	static char * GetDrivePosition(int drive);
@@ -488,6 +489,7 @@ private:
 	uint32_t partSectSize = 0;
 	uint32_t firstDataSector = 0;
 	uint32_t firstRootDirSect = 0;
+	uint32_t physToLogAdj = 0; // Some PC-98 HDI images have larger logical than physical bytes/sector and the partition is not a multiple of it, so this is needed
 
 	uint32_t cwdDirCluster = 0;
 

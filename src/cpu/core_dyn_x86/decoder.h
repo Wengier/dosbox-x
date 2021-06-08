@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -75,24 +75,24 @@ static bool MakeCodePage(Bitu lin_addr,CodePageHandler * &cph) {
 	uint8_t rdval;
 	const Bitu cflag = cpu.code.big ? PFLAG_HASCODE32:PFLAG_HASCODE16;
 	//Ensure page contains memory:
-	if (GCC_UNLIKELY(mem_readb_checked(lin_addr,&rdval))) return true;
-	PageHandler * handler=get_tlb_readhandler(lin_addr);
+	if (GCC_UNLIKELY(mem_readb_checked((const PhysPt)lin_addr,&rdval))) return true;
+	PageHandler * handler=get_tlb_readhandler((const PhysPt)lin_addr);
 	if (handler->flags & PFLAG_HASCODE) {
 		cph=( CodePageHandler *)handler;
 		if (handler->flags & cflag) return false;
 		cph->ClearRelease();
 		cph=0;
-		handler=get_tlb_readhandler(lin_addr);
+		handler=get_tlb_readhandler((const PhysPt)lin_addr);
 	}
 	if (handler->flags & PFLAG_NOCODE) {
 		if (PAGING_ForcePageInit(lin_addr)) {
-			handler=get_tlb_readhandler(lin_addr);
+			handler=get_tlb_readhandler((const PhysPt)lin_addr);
 			if (handler->flags & PFLAG_HASCODE) {
 				cph=( CodePageHandler *)handler;
 				if (handler->flags & cflag) return false;
 				cph->ClearRelease();
 				cph=0;
-				handler=get_tlb_readhandler(lin_addr);
+				handler=get_tlb_readhandler((const PhysPt)lin_addr);
 			}
 		}
 		if (handler->flags & PFLAG_NOCODE) {
@@ -141,7 +141,7 @@ static uint8_t decode_fetchb(void) {
 			/* trigger possible page fault here */
 			decode.page.first++;
 			Bitu fetchaddr=decode.page.first << 12;
-			mem_readb(fetchaddr);
+			mem_readb((const PhysPt)fetchaddr);
 			MakeCodePage(fetchaddr,decode.page.code);
 			CacheBlock * newblock=cache_getblock();
 			decode.active_block->crossblock=newblock;
@@ -206,7 +206,7 @@ static INLINE void decode_increase_wmapmask(Bitu size) {
 	if (GCC_UNLIKELY(!activecb->cache.wmapmask)) {
 		activecb->cache.wmapmask=(uint8_t*)malloc(START_WMMEM);
 		memset(activecb->cache.wmapmask,0,START_WMMEM);
-		activecb->cache.maskstart=decode.page.index;
+		activecb->cache.maskstart=(uint16_t)decode.page.index;
 		activecb->cache.masklen=START_WMMEM;
 		mapidx=0;
 	} else {
@@ -219,7 +219,7 @@ static INLINE void decode_increase_wmapmask(Bitu size) {
 			memcpy(tempmem,activecb->cache.wmapmask,activecb->cache.masklen);
 			free(activecb->cache.wmapmask);
 			activecb->cache.wmapmask=tempmem;
-			activecb->cache.masklen=newmasklen;
+			activecb->cache.masklen=(uint16_t)newmasklen;
 		}
 	}
 	switch (size) {
@@ -384,10 +384,10 @@ static BlockReturn DynRunPageFault(uint32_t eip_add,uint32_t cycle_sub,uint32_t 
 	reg_flags=(dflags&FMASK_TEST) | (reg_flags&(~FMASK_TEST));
 	reg_eip+=eip_add;
 	if (pf_restore_struct.data.stack)
-		reg_esp = core_dyn.pagefault_old_stack;
+		reg_esp = (uint32_t)core_dyn.pagefault_old_stack;
 #ifdef CPU_FPU
 	if (pf_restore_struct.data.fpu_top)
-		TOP = core_dyn.pagefault_old_fpu_top;
+		TOP = (uint32_t)core_dyn.pagefault_old_fpu_top;
 #endif
 	CPU_Cycles-=cycle_sub;
 	bool saved_allow = dosbox_allow_nonrecursive_page_fault;
@@ -982,16 +982,16 @@ static bool mem_readw_checked_dcx64(PhysPt address, uint16_t* dst) {
 	return get_tlb_readhandler(address)->readw_checked(address, dst);
 }
 static bool mem_writed_checked_dcx64(PhysPt address, Bitu val) {
-	return get_tlb_writehandler(address)->writed_checked(address, val);
+	return get_tlb_writehandler(address)->writed_checked(address, (uint32_t)val);
 }
 static bool mem_writew_checked_dcx64(PhysPt address, Bitu val) {
-	return get_tlb_writehandler(address)->writew_checked(address, val);
+	return get_tlb_writehandler(address)->writew_checked(address, (uint16_t)val);
 }
 static bool mem_readb_checked_dcx64(PhysPt address, uint8_t* dst) {
 	return get_tlb_readhandler(address)->readb_checked(address, dst);
 }
 static bool mem_writeb_checked_dcx64(PhysPt address, Bitu val) {
-	return get_tlb_writehandler(address)->writeb_checked(address, val);
+	return get_tlb_writehandler(address)->writeb_checked(address, (uint8_t)val);
 }
 
 static bool mem_readd_checked_dcx64_pagefault(PhysPt address, uint32_t* dst) {
@@ -1006,12 +1006,12 @@ static bool mem_readw_checked_dcx64_pagefault(PhysPt address, uint16_t* dst) {
 }
 static bool mem_writed_checked_dcx64_pagefault(PhysPt address, Bitu val) {
 	DYN_PAGEFAULT_CHECK({
-		return get_tlb_writehandler(address)->writed_checked(address, val);
+		return get_tlb_writehandler(address)->writed_checked(address, (uint32_t)val);
 	});
 }
 static bool mem_writew_checked_dcx64_pagefault(PhysPt address, Bitu val) {
 	DYN_PAGEFAULT_CHECK({
-		return get_tlb_writehandler(address)->writew_checked(address, val);
+		return get_tlb_writehandler(address)->writew_checked(address, (uint16_t)val);
 	});
 }
 static bool mem_readb_checked_dcx64_pagefault(PhysPt address, uint8_t* dst) {
@@ -1021,7 +1021,7 @@ static bool mem_readb_checked_dcx64_pagefault(PhysPt address, uint8_t* dst) {
 }
 static bool mem_writeb_checked_dcx64_pagefault(PhysPt address, Bitu val) {
 	DYN_PAGEFAULT_CHECK({
-		return get_tlb_writehandler(address)->writeb_checked(address, val);
+		return get_tlb_writehandler(address)->writeb_checked(address, (uint8_t)val);
 	});
 }
 
@@ -2371,14 +2371,40 @@ static void dyn_interrupt(Bitu num) {
 	dyn_closeblock();
 }
 
-static void dyn_add_iocheck(Bitu access_size) {
-	dyn_call_function_pagefault_check((void *)&CPU_IO_Exception,"%Dw%Id",DREG(EDX),access_size);
-	dyn_check_bool_exception_al();
+static bool dyn_io_writeB(Bitu port,uint8_t val) {
+	bool ex = CPU_IO_Exception(port,1);
+	if (!ex) IO_WriteB(port,val);
+	return ex;
 }
 
-static void dyn_add_iocheck_var(uint8_t accessed_port,Bitu access_size) {
-	dyn_call_function_pagefault_check((void *)&CPU_IO_Exception,"%Id%Id",accessed_port,access_size);
-	dyn_check_bool_exception_al();
+static bool dyn_io_writeW(Bitu port,uint16_t val) {
+	bool ex = CPU_IO_Exception(port,2);
+	if (!ex) IO_WriteW(port,val);
+	return ex;
+}
+
+static bool dyn_io_writeD(Bitu port,uint32_t val) {
+	bool ex = CPU_IO_Exception(port,4);
+	if (!ex) IO_WriteD(port,val);
+	return ex;
+}
+
+static bool dyn_io_readB(Bitu port) {
+	bool ex = CPU_IO_Exception(port,1);
+	if (!ex) core_dyn.readdata = IO_ReadB(port);
+	return ex;
+}
+
+static bool dyn_io_readW(Bitu port) {
+	bool ex = CPU_IO_Exception(port,2);
+	if (!ex) core_dyn.readdata = IO_ReadW(port);
+	return ex;
+}
+
+static bool dyn_io_readD(Bitu port) {
+	bool ex = CPU_IO_Exception(port,4);
+	if (!ex) core_dyn.readdata = IO_ReadD(port);
+	return ex;
 }
 
 static void dyn_xlat(void) {
@@ -2444,7 +2470,7 @@ static void dyn_larlsl(bool islar) {
 #include "dyn_fpu.h"
 
 #ifdef X86_DYNREC_MMX_ENABLED
-#include "mmx_gen.h"
+#include "dyn_mmx.h"
 #define dyn_mmx_check() if ((dyn_dh_fpu.dh_fpu_enabled) && (!fpu_used)) {dh_fpu_startup();}
 #endif
 
@@ -2464,7 +2490,7 @@ static CacheBlock * CreateCacheBlock(CodePageHandler * codepage,PhysPt start,Bit
 	decode.page.invmap=codepage->invalidation_map;
 	decode.page.first=start >> 12;
 	decode.active_block=decode.block=cache_openblock();
-	decode.block->page.start=decode.page.index;
+	decode.block->page.start=(uint16_t)decode.page.index;
 	codepage->AddCacheBlock(decode.block);
 
 	for (i=0;i<G_MAX;i++) {
@@ -2594,23 +2620,26 @@ restart_prefix:
 			case 0xd9:case 0xdb:case 0xdc:case 0xdd:case 0xdf:case 0xe1:
 			case 0xe2:case 0xe5:case 0xe8:case 0xe9:case 0xeb:case 0xec:
 			case 0xed:case 0xef:case 0xf1:case 0xf2:case 0xf3:case 0xf5:
-			case 0xf8:case 0xf9:case 0xfa:case 0xfc:case 0xfd:case 0xfe:
+			case 0xf8:case 0xf9:case 0xfa:case 0xfc:case 0xfd:case 0xfe:if (CPU_ArchitectureType<CPU_ARCHTYPE_PMMXSLOW) goto illegalopcode;
 				dyn_mmx_check(); dyn_mmx_op(dual_code); break;
-
 			/* SHIFT mm, imm8*/
-			case 0x71:case 0x72:case 0x73:
-				dyn_mmx_check(); dyn_mmx_shift_imm8(dual_code); break;
-
+			case 0x71:case 0x72:case 0x73:if (CPU_ArchitectureType<CPU_ARCHTYPE_PMMXSLOW) goto illegalopcode;
+				dyn_mmx_check(); dyn_mmx_shift_imm8((uint8_t)dual_code); break;
 			/* MOVD mm, r/m32 */
-			case 0x6e:dyn_mmx_check(); dyn_mmx_movd_pqed(); break;
+			case 0x6e:if (CPU_ArchitectureType<CPU_ARCHTYPE_PMMXSLOW) goto illegalopcode;
+				dyn_mmx_check(); dyn_mmx_movd_pqed(); break;
 			/* MOVQ mm, mm/m64 */
-			case 0x6f:dyn_mmx_check(); dyn_mmx_movq_pqqq(); break;
+			case 0x6f:if (CPU_ArchitectureType<CPU_ARCHTYPE_PMMXSLOW) goto illegalopcode;
+				dyn_mmx_check(); dyn_mmx_movq_pqqq(); break;
 			/* MOVD r/m32, mm */
-			case 0x7e:dyn_mmx_check(); dyn_mmx_movd_edpq(); break;
+			case 0x7e:if (CPU_ArchitectureType<CPU_ARCHTYPE_PMMXSLOW) goto illegalopcode;
+				dyn_mmx_check(); dyn_mmx_movd_edpq(); break;
 			/* MOVQ mm/m64, mm */
-			case 0x7f:dyn_mmx_check(); dyn_mmx_movq_qqpq(); break;
+			case 0x7f:if (CPU_ArchitectureType<CPU_ARCHTYPE_PMMXSLOW) goto illegalopcode;
+				dyn_mmx_check(); dyn_mmx_movq_qqpq(); break;
 			/* EMMS */
-			case 0x77:dyn_mmx_check(); dyn_mmx_emms(); break;
+			case 0x77:if (CPU_ArchitectureType<CPU_ARCHTYPE_PMMXSLOW) goto illegalopcode;
+				dyn_mmx_check(); dyn_mmx_emms(); break;
 #endif
 
 			default:
@@ -3016,35 +3045,33 @@ restart_prefix:
 		case 0xe2:dyn_loop(LOOP_NONE);goto finish_block;
 		case 0xe3:dyn_loop(LOOP_JCXZ);goto finish_block;
 		//IN AL/AX,imm
-		case 0xe4: {
-			Bitu port=decode_fetchb();
-			dyn_add_iocheck_var(port,1);
-			dyn_call_function_pagefault_check((void*)&IO_ReadB,"%Id%Rl",port,DREG(EAX));
-			} break;
-		case 0xe5: {
-			Bitu port=decode_fetchb();
-			dyn_add_iocheck_var(port,decode.big_op?4:2);
-			if (decode.big_op) {
-                dyn_call_function_pagefault_check((void*)&IO_ReadD,"%Id%Rd",port,DREG(EAX));
+		case 0xe4:
+			dyn_call_function_pagefault_check((void*)&dyn_io_readB,"%Id",decode_fetchb());
+			dyn_check_bool_exception_al();
+			gen_mov_host(&core_dyn.readdata,DREG(EAX),1);
+			break;
+		case 0xe5:
+			if (!decode.big_op) {
+				dyn_call_function_pagefault_check((void*)&dyn_io_readW,"%Id",decode_fetchb());
 			} else {
-				dyn_call_function_pagefault_check((void*)&IO_ReadW,"%Id%Rw",port,DREG(EAX));
+				dyn_call_function_pagefault_check((void*)&dyn_io_readD,"%Id",decode_fetchb());
 			}
-			} break;
+			dyn_check_bool_exception_al();
+			gen_mov_host(&core_dyn.readdata,DREG(EAX),decode.big_op?4:2);
+			break;
 		//OUT imm,AL
-		case 0xe6: {
-			Bitu port=decode_fetchb();
-			dyn_add_iocheck_var(port,1);
-			dyn_call_function_pagefault_check((void*)&IO_WriteB,"%Id%Dl",port,DREG(EAX));
-			} break;
-		case 0xe7: {
-			Bitu port=decode_fetchb();
-			dyn_add_iocheck_var(port,decode.big_op?4:2);
-			if (decode.big_op) {
-                dyn_call_function_pagefault_check((void*)&IO_WriteD,"%Id%Dd",port,DREG(EAX));
+		case 0xe6:
+			dyn_call_function_pagefault_check((void*)&dyn_io_writeB,"%Id%Dl",decode_fetchb(),DREG(EAX));
+			dyn_check_bool_exception_al();
+			break;
+		case 0xe7:
+			if (!decode.big_op) {
+				dyn_call_function_pagefault_check((void*)&dyn_io_writeW,"%Id%Dw",decode_fetchb(),DREG(EAX));
 			} else {
-				dyn_call_function_pagefault_check((void*)&IO_WriteW,"%Id%Dw",port,DREG(EAX));
+				dyn_call_function_pagefault_check((void*)&dyn_io_writeD,"%Id%Dd",decode_fetchb(),DREG(EAX));
 			}
-			} break;
+			dyn_check_bool_exception_al();
+			break;
 		case 0xe8:		/* CALL Ivx */
 			dyn_call_near_imm();
 			goto finish_block;
@@ -3058,29 +3085,31 @@ restart_prefix:
 		case 0xeb:dyn_exit_link((int8_t)decode_fetchb());goto finish_block;
 		/* IN AL/AX,DX*/
 		case 0xec:
-			dyn_add_iocheck(1);
-			dyn_call_function_pagefault_check((void*)&IO_ReadB,"%Dw%Rl",DREG(EDX),DREG(EAX));
+			dyn_call_function_pagefault_check((void*)&dyn_io_readB,"%Dw",DREG(EDX));
+			dyn_check_bool_exception_al();
+			gen_mov_host(&core_dyn.readdata,DREG(EAX),1);
 			break;
 		case 0xed:
-			dyn_add_iocheck(decode.big_op?4:2);
-			if (decode.big_op) {
-                dyn_call_function_pagefault_check((void*)&IO_ReadD,"%Dw%Rd",DREG(EDX),DREG(EAX));
+			if (!decode.big_op) {
+				dyn_call_function_pagefault_check((void*)&dyn_io_readW,"%Dw",DREG(EDX));
 			} else {
-				dyn_call_function_pagefault_check((void*)&IO_ReadW,"%Dw%Rw",DREG(EDX),DREG(EAX));
+				dyn_call_function_pagefault_check((void*)&dyn_io_readD,"%Dw",DREG(EDX));
 			}
+			dyn_check_bool_exception_al();
+			gen_mov_host(&core_dyn.readdata,DREG(EAX),decode.big_op?4:2);
 			break;
 		/* OUT DX,AL/AX */
 		case 0xee:
-			dyn_add_iocheck(1);
-			dyn_call_function_pagefault_check((void*)&IO_WriteB,"%Dw%Dl",DREG(EDX),DREG(EAX));
+			dyn_call_function_pagefault_check((void*)&dyn_io_writeB,"%Dw%Dl",DREG(EDX),DREG(EAX));
+			dyn_check_bool_exception_al();
 			break;
 		case 0xef:
-			dyn_add_iocheck(decode.big_op?4:2);
-			if (decode.big_op) {
-                dyn_call_function_pagefault_check((void*)&IO_WriteD,"%Dw%Dd",DREG(EDX),DREG(EAX));
+			if (!decode.big_op) {
+				dyn_call_function_pagefault_check((void*)&dyn_io_writeW,"%Dw%Dw",DREG(EDX),DREG(EAX));
 			} else {
-				dyn_call_function_pagefault_check((void*)&IO_WriteW,"%Dw%Dw",DREG(EDX),DREG(EAX));
+				dyn_call_function_pagefault_check((void*)&dyn_io_writeD,"%Dw%Dd",DREG(EDX),DREG(EAX));
 			}
+			dyn_check_bool_exception_al();
 			break;
 		case 0xf0:		//LOCK
 			goto restart_prefix;
@@ -3095,7 +3124,7 @@ restart_prefix:
 		case 0xf8:		//CLC
 		case 0xf9:		//STC
 			gen_needflags();
-			cache_addb(opcode);break;
+			cache_addb((uint8_t)opcode);break;
 		/* GRP 3 Eb/EV */
 		case 0xf6:dyn_grp3_eb();break;
 		case 0xf7:dyn_grp3_ev();break;
@@ -3248,7 +3277,7 @@ illegalopcode:
 #endif
 finish_block:
 	/* Setup the correct end-address */
-	decode.active_block->page.end=--decode.page.index;
+	decode.active_block->page.end=(uint16_t)--decode.page.index;
 //	LOG_MSG("Created block size %d start %d end %d",decode.block->cache.size,decode.block->page.start,decode.block->page.end);
 	cache_remap_rx();
 	return decode.block;

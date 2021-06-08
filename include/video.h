@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -75,7 +75,6 @@ bool GFX_IsFullscreen(void);
 void GFX_SwitchLazyFullscreen(bool lazy);
 bool GFX_LazyFullscreenRequested(void);
 void GFX_SwitchFullscreenNoReset(void);
-void GFX_RestoreMode(void);
 void GFX_UpdateSDLCaptureState(void);
 
 #if defined (WIN32)

@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -67,7 +67,7 @@ protected:
     std::istringstream      lines;
 };
 
-extern uint8_t                int10_font_14[256 * 14];
+extern uint8_t              int10_font_14[256 * 14], int10_font_14_init[256 * 14];
 
 extern uint32_t             GFX_Rmask;
 extern unsigned char        GFX_Rshift;
@@ -77,10 +77,12 @@ extern uint32_t             GFX_Bmask;
 extern unsigned char        GFX_Bshift;
 
 extern int                  statusdrive, swapInDisksSpecificDrive;
-extern bool                 dos_kernel_disabled, confres;
+extern bool                 dos_kernel_disabled, confres, swapad, font_14_init;
 extern Bitu                 currentWindowWidth, currentWindowHeight;
+extern std::string          strPasteBuffer, langname;
 
-extern bool                 MSG_Write(const char *);
+extern void                 PasteClipboard(bool bPressed);
+extern bool                 MSG_Write(const char *, const char *);
 extern void                 LoadMessageFile(const char * fname);
 extern void                 GFX_SetTitle(int32_t cycles, int frameskip, Bits timing, bool paused);
 
@@ -108,6 +110,10 @@ void                        WindowsTaskbarUpdatePreviewRegion(void);
 void                        WindowsTaskbarResetPreviewRegion(void);
 #endif
 
+#if defined(MACOSX)
+void                        macosx_reload_touchbar(void);
+#endif
+
 const char *aboutmsg = "DOSBox-X version " VERSION " (" SDL_STRING ", "
 #if defined(_M_X64) || defined (_M_AMD64) || defined (_M_ARM64) || defined (_M_IA64) || defined(__ia64__) || defined(__LP64__) || defined(_WIN64) || defined(__x86_64__) || defined(__aarch64__) || defined(__powerpc64__)
 	"64"
@@ -125,7 +131,7 @@ void RebootConfig(std::string filename, bool confirm=false) {
 #if defined(WIN32)
         ShellExecute(NULL, "open", exepath.c_str(), para.c_str(), NULL, SW_NORMAL);
 #else
-        system((exepath+" "+para).c_str());
+        system((exepath+" "+para+ " &").c_str());
 #endif
         throw(0);
     }
@@ -133,7 +139,7 @@ void RebootConfig(std::string filename, bool confirm=false) {
 
 /* Prepare screen for UI */
 void GUI_LoadFonts(void) {
-    GUI::Font::addFont("default",new GUI::BitmapFont(int10_font_14,14,10));
+    GUI::Font::addFont("default",new GUI::BitmapFont(font_14_init&&dos.loaded_codepage&&dos.loaded_codepage!=437?int10_font_14_init:int10_font_14,14,10));
 }
 
 static void getPixel(Bits x, Bits y, int &r, int &g, int &b, int shift)
@@ -195,6 +201,7 @@ static GUI::ScreenSDL *UI_Startup(GUI::ScreenSDL *screen) {
 
     Section_prop *section = static_cast<Section_prop *>(control->GetSection("dosbox"));
     LoadMessageFile(section->Get_string("language"));
+    if (font_14_init) GUI_LoadFonts();
 
     // Comparable to the code of intro.com, but not the same! (the code of intro.com is called from within a com file)
     shell_idle = !dos_kernel_disabled && strcmp(RunningProgram, "LOADLIN") && first_shell && (DOS_PSP(dos.psp()).GetSegment() == DOS_PSP(dos.psp()).GetParent());
@@ -446,8 +453,7 @@ static GUI::ScreenSDL *UI_Startup(GUI::ScreenSDL *screen) {
     running = true;
 
 #if defined(MACOSX)
-    void osx_reload_touchbar(void);
-    osx_reload_touchbar();
+    macosx_reload_touchbar();
 #endif
 
     return screen;
@@ -463,8 +469,7 @@ static void UI_Shutdown(GUI::ScreenSDL *screen) {
 #endif
 
 #if defined(MACOSX)
-    void osx_reload_touchbar(void);
-    osx_reload_touchbar();
+    macosx_reload_touchbar();
 #endif
 
 #if defined(C_SDL2)
@@ -520,7 +525,7 @@ static void UI_Shutdown(GUI::ScreenSDL *screen) {
     void res_init(void);
     void change_output(int output);
     res_init();
-    change_output(7);
+    change_output(8);
 #else
 #if 1
     GFX_RestoreMode();
@@ -812,6 +817,10 @@ std::string CapName(std::string name) {
         dispname="IDE Port #7";
     else if (name=="ide, octernary")
         dispname="IDE Port #8";
+    else if (name=="ethernet, pcap")
+        dispname="Ethernet PCap";
+    else if (name=="ethernet, slirp")
+        dispname="Ethernet Slirp";
     else
         dispname[0] = std::toupper(name[0]);
     return dispname;
@@ -857,6 +866,10 @@ std::string RestoreName(std::string name) {
         dispname="ide, septernary";
     else if (name=="IDE Port #8")
         dispname="ide, octernary";
+    else if (name=="Ethernet PCap")
+        dispname="ethernet, pcap";
+    else if (name=="Ethernet Slirp")
+        dispname="ethernet, slirp";
     return dispname;
 }
 
@@ -886,7 +899,30 @@ public:
             while ((p = sec->Get_prop(i++))) {
                 std::string help=title=="4dos"&&p->propname=="rem"?"This is the 4DOS.INI file (if you use 4DOS as the command shell).":p->Get_help();
                 if (title!="4dos" && title!="Config" && title!="Autoexec" && !advopt->isChecked() && !p->basic()) continue;
-                msg += std::string("\033[31m")+p->propname+":\033[0m\n"+help+"\n\n";
+                std::string propvalues = "";
+                std::vector<Value> pv = p->GetValues();
+                if (p->Get_type()==Value::V_BOOL) {
+                    // possible values for boolean are true, false
+                    propvalues += "true, false";
+                } else if (p->Get_type()==Value::V_INT) {
+                    // print min, max for integer values if used
+                    Prop_int* pint = dynamic_cast <Prop_int*>(p);
+                    if (pint==NULL) E_Exit("Int property dynamic cast failed.");
+                    if (pint->getMin() != pint->getMax()) {
+                        std::ostringstream oss;
+                        oss << pint->getMin();
+                        oss << "..";
+                        oss << pint->getMax();
+                        propvalues += oss.str();
+                    }
+                }
+                for(Bitu k = 0; k < pv.size(); k++) {
+                    if (pv[k].ToString() =="%u")
+                        propvalues += MSG_Get("PROGRAM_CONFIG_HLP_POSINT");
+                    else propvalues += pv[k].ToString();
+                    if ((k+1) < pv.size() && (title != "Config" || p->propname != "numlock" || pv[k+1].ToString() != "")) propvalues += ", ";
+                }
+                msg += std::string("\033[31m")+p->propname+":\033[0m\n"+help+(propvalues==""?"":"\nPossible values: \033[32m"+propvalues+"\033[0m")+(p->Get_Default_Value().ToString().size()?"\nDefault value: \033[32m"+p->Get_Default_Value().ToString():"")+"\033[0m\n\n";
             }
             if (!msg.empty()) msg.replace(msg.end()-1,msg.end(),"");
             setText(msg);
@@ -1169,7 +1205,7 @@ public:
         int button_row_y = first_row_y + scroll_h + 5;
         int button_w = 70;
         int button_pad_w = 10;
-        int button_row_w = ((button_pad_w + button_w) * 3) - button_pad_w;
+        int button_row_w = ((button_pad_w + button_w) * 4 + button_w) - button_pad_w;
         int button_row_cx = (((columns * column_width) - button_row_w) / 2) + 5;
 
         resize((columns * column_width) + border_left + border_right + 2/*wiw border*/ + wiw->vscroll_display_width/*scrollbar*/ + 10,
@@ -1182,14 +1218,17 @@ public:
         content = new GUI::Input(this, 5, button_row_y-height+20, 510 - border_left - border_right, height-25);
         content->setText(extra_data);
 
-        GUI::Button *b = new GUI::Button(this, button_row_cx, button_row_y, "Cancel", button_w);
+        GUI::Button *b = new GUI::Button(this, button_row_cx, button_row_y, "Paste Clipboard", button_w*2);
+        b->addActionHandler(this);
+
+        b = new GUI::Button(this, button_row_cx + button_w + (button_w + button_pad_w), button_row_y, "Help", button_w);
+        b->addActionHandler(this);
+
+        b = new GUI::Button(this, button_row_cx + button_w + (button_w + button_pad_w)*2, button_row_y, "Cancel", button_w);
         b->addActionHandler(this);
         closeButton = b;
 
-        b = new GUI::Button(this, button_row_cx + (button_w + button_pad_w), button_row_y, "Help", button_w);
-        b->addActionHandler(this);
-
-        b = new GUI::Button(this, button_row_cx + (button_w + button_pad_w)*2, button_row_y, "OK", button_w);
+        b = new GUI::Button(this, button_row_cx + button_w + (button_w + button_pad_w)*3, button_row_y, "OK", button_w);
 
         int i = 0;
         Property *prop;
@@ -1259,6 +1298,7 @@ public:
 
     void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
         if (arg == "OK") section->data = *(std::string*)content->getText();
+        std::string lines = *(std::string*)content->getText();
         if (arg == "OK" || arg == "Cancel" || arg == "Close") { close(); if(shortcut) running=false; }
         else if (arg == "Help") {
             std::vector<GUI::Char> new_cfg_sname;
@@ -1288,6 +1328,24 @@ public:
             else {
                 lookup->second->raise();
             }
+		} else if (arg == "Paste Clipboard") {
+			strPasteBuffer="";
+			swapad=false;
+			PasteClipboard(true);
+			swapad=true;
+			unsigned char head;
+            GUI::Key *key;
+            GUI::Key::Special ksym = (GUI::Key::Special)0;
+			while (strPasteBuffer.length()) {
+                key = NULL;
+				head = strPasteBuffer[0];
+				if (head == 9) for (int i=0; i<8; i++) key = new GUI::Key(' ', ksym, false, false, false, false);
+				else if (head == 13) key = new GUI::Key(0, GUI::Key::Enter, false, false, false, false);
+				else if (head > 31) key = new GUI::Key(head, ksym, false, false, false, false);
+                if (key != NULL) content->keyDown(*key);
+				strPasteBuffer = strPasteBuffer.substr(1, strPasteBuffer.length());
+			}
+            return;
         } else ToplevelWindow::actionExecuted(b, arg);
     }
 
@@ -1317,7 +1375,7 @@ public:
     std::vector<GUI::Char> cfg_sname;
 public:
     AutoexecEditor(GUI::Screen *parent, int x, int y, Section_line *section) :
-        ToplevelWindow(parent, x, y, 450, 260 + GUI::titlebar_y_stop, ""), section(section) {
+        ToplevelWindow(parent, x, y, 550, 260 + GUI::titlebar_y_stop, ""), section(section) {
         if (section == NULL) {
             LOG_MSG("BUG: AutoexecEditor constructor called with section == NULL\n");
             return;
@@ -1327,12 +1385,13 @@ public:
         title[0] = std::toupper(title[0]);
         setTitle("Edit "+title);
         new GUI::Label(this, 5, 10, "Content:");
-        content = new GUI::Input(this, 5, 30, 450 - 10 - border_left - border_right, 185);
+        content = new GUI::Input(this, 5, 30, 550 - 10 - border_left - border_right, 185);
         content->setText(section->data);
-        if (first_shell) (new GUI::Button(this, 5, 220, "Append History"))->addActionHandler(this);
-        if (shell_idle) (new GUI::Button(this, 180, 220, "Execute Now"))->addActionHandler(this);
-        (closeButton = new GUI::Button(this, 290, 220, "Cancel", 70))->addActionHandler(this);
-        (new GUI::Button(this, 360, 220, "OK", 70))->addActionHandler(this);
+        (new GUI::Button(this, 5, 220, "Paste Clipboard"))->addActionHandler(this);
+        if (first_shell) (new GUI::Button(this, 147, 220, "Append History"))->addActionHandler(this);
+        if (shell_idle) (new GUI::Button(this, 281, 220, "Execute Now"))->addActionHandler(this);
+        (closeButton = new GUI::Button(this, 391, 220, "Cancel", 70))->addActionHandler(this);
+        (new GUI::Button(this, 461, 220, "OK", 70))->addActionHandler(this);
         move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
     }
 
@@ -1346,7 +1405,25 @@ public:
     void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
         if (arg == "OK") section->data = *(std::string*)content->getText();
         if (arg == "OK" || arg == "Cancel" || arg == "Close") { close(); if(shortcut) running=false; }
-        else if (arg == "Append History") {
+        else if (arg == "Paste Clipboard") {
+			strPasteBuffer="";
+			swapad=false;
+			PasteClipboard(true);
+			swapad=true;
+			unsigned char head;
+            GUI::Key *key;
+            GUI::Key::Special ksym = (GUI::Key::Special)0;
+			while (strPasteBuffer.length()) {
+                key = NULL;
+				head = strPasteBuffer[0];
+				if (head == 9) for (int i=0; i<8; i++) key = new GUI::Key(' ', ksym, false, false, false, false);
+				else if (head == 13) key = new GUI::Key(0, GUI::Key::Enter, false, false, false, false);
+				else if (head > 31) key = new GUI::Key(head, ksym, false, false, false, false);
+                if (key != NULL) content->keyDown(*key);
+				strPasteBuffer = strPasteBuffer.substr(1, strPasteBuffer.length());
+			}
+			return;
+		} else if (arg == "Append History") {
             std::list<std::string>::reverse_iterator i = first_shell->l_history.rbegin();
             std::string lines = *(std::string*)content->getText();
             while (i != first_shell->l_history.rend()) {
@@ -1381,6 +1458,7 @@ public:
 class SaveDialog : public GUI::ToplevelWindow {
 protected:
     GUI::Input *name;
+    GUI::Button *saveButton = NULL, *closeButton = NULL;
 public:
     SaveDialog(GUI::Screen *parent, int x, int y, const char *title) :
         ToplevelWindow(parent, x, y, 620, 160 + GUI::titlebar_y_stop, title) {
@@ -1396,12 +1474,15 @@ public:
         (new GUI::Button(this, 210, 60, "Use portable config file", 210))->addActionHandler(this);
         (new GUI::Button(this, 425, 60, "Use user config file", 180))->addActionHandler(this);
         Section_prop * section=static_cast<Section_prop *>(control->GetSection("dosbox"));
-        saveall = new GUI::Checkbox(this, 5, 95, "Save all config options to the configuration file");
+        saveall = new GUI::Checkbox(this, 5, 95, "Save all (including advanced) config options to the configuration file");
         saveall->setChecked(section->Get_bool("show advanced options"));
-        (new GUI::Button(this, 150, 120, "Save", 70))->addActionHandler(this);
+        (saveButton = new GUI::Button(this, 150, 120, "Save", 70))->addActionHandler(this);
         (new GUI::Button(this, 240, 120, "Save & Restart", 140))->addActionHandler(this);
-        (new GUI::Button(this, 400, 120, "Cancel", 70))->addActionHandler(this);
+        (closeButton = new GUI::Button(this, 400, 120, "Cancel", 70))->addActionHandler(this);
         move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
+
+        name->raise(); /* make sure keyboard focus is on the text field, ready for the user */
+        name->posToEnd(); /* position the cursor at the end where the user is most likely going to edit */
     }
 
     void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
@@ -1435,27 +1516,66 @@ public:
         close();
         if(shortcut) running=false;
     }
+
+    virtual bool keyUp(const GUI::Key &key) {
+        if (GUI::ToplevelWindow::keyUp(key)) return true;
+
+        if (key.special == GUI::Key::Enter) {
+            saveButton->executeAction();
+            return true;
+        }
+
+        if (key.special == GUI::Key::Escape) {
+            closeButton->executeAction();
+            return true;
+        }
+
+        return false;
+    }
 };
 
 class SaveLangDialog : public GUI::ToplevelWindow {
 protected:
-    GUI::Input *name;
+    GUI::Input *name, *lang;
+    GUI::Button *saveButton = NULL, *closeButton = NULL;
 public:
     SaveLangDialog(GUI::Screen *parent, int x, int y, const char *title) :
-        ToplevelWindow(parent, x, y, 400, 100 + GUI::titlebar_y_stop, title) {
+        ToplevelWindow(parent, x, y, 400, 150 + GUI::titlebar_y_stop, title) {
         new GUI::Label(this, 5, 10, "Enter filename for language file:");
         name = new GUI::Input(this, 5, 30, width - 10 - border_left - border_right);
-        name->setText("messages.txt");
-        (new GUI::Button(this, 120, 60, "OK", 70))->addActionHandler(this);
-        (new GUI::Button(this, 210, 60, "Cancel", 70))->addActionHandler(this);
+        name->setText(control->opt_lang != "" ? control->opt_lang.c_str() : "messages.txt");
+        new GUI::Label(this, 5, 60, "Language name (optional):");
+        lang = new GUI::Input(this, 5, 80, width - 10 - border_left - border_right);
+        lang->setText(langname.c_str());
+        (saveButton = new GUI::Button(this, 120, 110, "OK", 70))->addActionHandler(this);
+        (closeButton = new GUI::Button(this, 210, 110, "Cancel", 70))->addActionHandler(this);
         move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
+
+        name->raise(); /* make sure keyboard focus is on the text field, ready for the user */
+        name->posToEnd(); /* position the cursor at the end where the user is most likely going to edit */
     }
 
     void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
         (void)b;//UNUSED
-        if (arg == "OK") MSG_Write(name->getText());
+        if (arg == "OK") MSG_Write(name->getText(), lang->getText());
         close();
         if(shortcut) running=false;
+    }
+
+    virtual bool keyUp(const GUI::Key &key) {
+        if (GUI::ToplevelWindow::keyUp(key)) return true;
+
+        if (key.special == GUI::Key::Enter) {
+            saveButton->executeAction();
+            return true;
+        }
+
+        if (key.special == GUI::Key::Escape) {
+            closeButton->executeAction();
+            return true;
+        }
+
+        return false;
     }
 };
 
@@ -1487,6 +1607,48 @@ public:
         else {
             return GUI::Input::keyDown(key);
         }
+    }
+};
+
+extern double vga_force_refresh_rate;
+void SetRate(char *x);
+class SetRefreshRate : public GUI::ToplevelWindow {
+protected:
+    InputWithEnterKey *name;
+public:
+    SetRefreshRate(GUI::Screen *parent, int x, int y, const char *title) :
+        ToplevelWindow(parent, x, y, 400, 100 + GUI::titlebar_y_stop, title) {
+        new GUI::Label(this, 5, 10, "Enter video refresh rate (0 = unlocked):");
+        name = new InputWithEnterKey(this, 5, 30, width - 10 - border_left - border_right);
+        name->set_trigger_target(this);
+        std::ostringstream str;
+        str << (vga_force_refresh_rate < 0 ? 0 : vga_force_refresh_rate);
+
+        std::string rates=str.str();
+        name->setText(rates.c_str());
+        (new GUI::Button(this, 120, 60, "Cancel", 70))->addActionHandler(this);
+        (new GUI::Button(this, 210, 60, "OK", 70))->addActionHandler(this);
+        move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
+
+        name->raise(); /* make sure keyboard focus is on the text field, ready for the user */
+        name->posToEnd(); /* position the cursor at the end where the user is most likely going to edit */
+    }
+
+    void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+        (void)b;//UNUSED
+        if (arg == "OK") {
+            char *str = (char*)name->getText();
+            if (str == NULL || !strcmp(str, "0"))
+                vga_force_refresh_rate = -1;
+            else
+                SetRate(str);
+            if (vga_force_refresh_rate > 0)
+                LOG_MSG("Video refresh rate is locked to %.3f fps.",vga_force_refresh_rate);
+            else
+                LOG_MSG("Video refresh rate is unlocked.");
+        }
+        close();
+        if(shortcut) running=false;
     }
 };
 
@@ -1580,7 +1742,7 @@ public:
                 if (autosave_start[i]<-1) autosave_start[i]=-1;
                 autosave_end[i] = atoi(end[i]->getText());
                 if (autosave_end[i]<autosave_start[i]) autosave_end[i]=0;
-                if (autosave_start[i]>1&&autosave_start[i]<=100&&autosave_last[i]<autosave_start[i]||autosave_last[i]>(autosave_end[i]>=autosave_start[i]&&autosave_end[i]<=100?autosave_end[i]:autosave_start[i])) autosave_last[i]=-1;
+                if ((autosave_start[i]>1&&autosave_start[i]<=100&&autosave_last[i]<autosave_start[i])||(autosave_last[i]>(autosave_end[i]>=autosave_start[i]&&autosave_end[i]<=100?autosave_end[i]:autosave_start[i]))) autosave_last[i]=-1;
             }
             if (!mainMenu.get_item("enable_autosave").is_enabled()&&autosave_second) enable_autosave = autosave_second>0;
             if (autosave_second<0) autosave_second=-autosave_second;
@@ -1738,7 +1900,7 @@ protected:
 public:
     ShowMixerInfo(GUI::Screen *parent, int x, int y, const char *title) :
         ToplevelWindow(parent, x, y, 350, 270, title) {
-            std::string mixerinfo();
+            extern std::string mixerinfo();
             std::istringstream in(mixerinfo().c_str());
             int r=0;
             if (in)	for (std::string line; std::getline(in, line); ) {
@@ -1758,9 +1920,7 @@ public:
     }
 };
 
-std::string GetSBtype(), GetSBbase();
-Bitu GetSBirq();
-uint8_t GetSBldma(), GetSBhdma();
+std::string GetSBtype(), GetSBbase(), GetSBirq(), GetSBldma(), GetSBhdma();
 
 class ShowSBInfo : public GUI::ToplevelWindow {
 protected:
@@ -1768,7 +1928,7 @@ protected:
 public:
     ShowSBInfo(GUI::Screen *parent, int x, int y, const char *title) :
         ToplevelWindow(parent, x, y, 320, 230, title) {
-            std::string sbinfo = "Sound Blaster type: "+GetSBtype()+"\nSound Blaster base: "+GetSBbase()+"\nSound Blaster IRQ: "+std::to_string(GetSBirq())+"\nSound Blaster Low DMA: "+std::to_string((unsigned int)GetSBldma())+"\nSound Blaster High DMA: "+std::to_string((unsigned int)GetSBhdma());
+            std::string sbinfo = "Sound Blaster type: "+GetSBtype()+"\nSound Blaster base: "+GetSBbase()+"\nSound Blaster IRQ: "+GetSBirq()+"\nSound Blaster Low DMA: "+GetSBldma()+"\nSound Blaster High DMA: "+GetSBhdma();
             std::istringstream in(sbinfo.c_str());
             int r=0;
             if (in)	for (std::string line; std::getline(in, line); ) {
@@ -1801,7 +1961,7 @@ public:
                 else if (name=="fluidsynth") name="FluidSynth";
                 else name[0]=toupper(name[0]);
             }
-            std::string getoplmode(), getoplemu();
+            extern std::string getoplmode(), getoplemu();
             std::string midiinfo = "MIDI available: "+std::string(midi.available?"Yes":"No")+"\nMIDI device: "+name+"\nMIDI soundfont file / ROM path:\n"+sffile+"\nOPL mode: "+getoplmode()+"\nOPL emulation: "+getoplemu();
             std::istringstream in(midiinfo.c_str());
             int r=0;
@@ -1968,7 +2128,7 @@ protected:
 public:
     ShowIDEInfo(GUI::Screen *parent, int x, int y, const char *title) :
         ToplevelWindow(parent, x, y, 300, 210, title) {
-            std::string GetIDEInfo();
+            extern std::string GetIDEInfo();
             std::istringstream in(GetIDEInfo().c_str());
             int r=0;
             if (in)	for (std::string line; std::getline(in, line); ) {
@@ -2304,7 +2464,7 @@ public:
     }
 };
 
-std::string niclist="NE2000 networking is not enabled. Check [ne2000] section of the configuration.";
+std::string niclist="The pcap networking for NE2000 Ethernet emulation is not currently active.\nPlease check [ne2000] and [ethernet, pcap] sections of the configuration.";
 class ShowHelpNIC : public GUI::ToplevelWindow {
 protected:
     GUI::Input *name;
@@ -2369,7 +2529,7 @@ public:
             else if (helpcmd=="RD") helpcmd="RMDIR";
             else if (helpcmd=="REN") helpcmd="RENAME";
             std::string helpinfo=std::string(MSG_Get(("SHELL_CMD_"+helpcmd+"_HELP").c_str()))+"\n"+std::string(MSG_Get(("SHELL_CMD_"+helpcmd+"_HELP_LONG").c_str()));
-            std::istringstream in(str_replace(str_replace(str_replace(str_replace((char *)helpinfo.c_str(), "%%", "%"), "\033[0m", ""), "\033[33;1m", ""), "\033[37;1m", ""));
+            std::istringstream in(str_replace(str_replace(str_replace(str_replace((char *)helpinfo.c_str(), (char*)"%%", (char*)"%"), (char*)"\033[0m", (char*)""), (char*)"\033[33;1m", (char*)""), (char*)"\033[37;1m", (char*)""));
             int r=0;
             if (in)	for (std::string line; std::getline(in, line); ) {
                 r+=25;
@@ -2445,13 +2605,13 @@ public:
         }
 
         const auto finalgridpos = gridfunc(i - 1);
-        int closerow_y = finalgridpos.second + 12 + gridbtnheight;
+        int closerow_y = finalgridpos.second + 5 + gridbtnheight;
 
         (saveButton = new GUI::Button(this, 190, closerow_y, "Save...", 80))->addActionHandler(this);
         (closeButton = new GUI::Button(this, 275, closerow_y, "Close", 80))->addActionHandler(this);
 
         resize(gridbtnx + (gridbtnwidth * btnperrow) + 12 + border_left + border_right,
-               closerow_y + closeButton->getHeight() + 12 + border_top + border_bottom);
+               closerow_y + closeButton->getHeight() + 8 + border_top + border_bottom);
 
         bar->resize(getWidth(),bar->getHeight());
         move(parent->getWidth()>this->getWidth()?(parent->getWidth()-this->getWidth())/2:0,parent->getHeight()>this->getHeight()?(parent->getHeight()-this->getHeight())/2:0);
@@ -2547,9 +2707,11 @@ public:
             //new GUI::MessageBox2(getScreen(), 20, 50, 640, "CD-ROM Support", MSG_Get("PROGRAM_INTRO_CDROM"));
             new GUI::MessageBox2(getScreen(), getScreen()->getWidth()>640?(parent->getWidth()-640)/2:0, 50, 640, "CD-ROM Support", MSG_Get("PROGRAM_INTRO_CDROM"));
         } else if (arg == "Save...") {
-            new SaveDialog(getScreen(), 50, 100, "Save Configuration...");
+            auto *np = new SaveDialog(getScreen(), 50, 100, "Save Configuration...");
+            np->raise();
         } else if (arg == "Save Language File...") {
-            new SaveLangDialog(getScreen(), 90, 100, "Save Language File...");
+            auto *np = new SaveLangDialog(getScreen(), 90, 100, "Save Language File...");
+            np->raise();
         } else {
             return ToplevelWindow::actionExecuted(b, arg);
         }
@@ -2630,9 +2792,10 @@ static void UI_Select(GUI::ScreenSDL *screen, int select) {
             new GUI::MessageBox2(screen, 200, 150, 280, "", "");
             running=false;
             break;
-        case 1:
-            new SaveDialog(screen, 90, 100, "Save Configuration...");
-            break;
+        case 1: {
+            auto *np = new SaveDialog(screen, 90, 100, "Save Configuration...");
+            np->raise();
+            } break;
         case 2: {
             sec = control->GetSection("sdl");
             section=static_cast<Section_prop *>(sec); 
@@ -2668,9 +2831,10 @@ static void UI_Select(GUI::ScreenSDL *screen, int select) {
             section=static_cast<Section_prop *>(sec); 
             new SectionEditor(screen,50,30,section);
             break;
-        case 9:
-            new SaveLangDialog(screen, 90, 100, "Save Language File...");
-            break;
+        case 9: {
+            auto *np = new SaveLangDialog(screen, 90, 100, "Save Language File...");
+            np->raise();
+            } break;
         case 10: {
             auto *np = new ConfigurationWindow(screen, 40, 10, configString);
             np->raise();
@@ -2754,6 +2918,10 @@ static void UI_Select(GUI::ScreenSDL *screen, int select) {
             } break;
         case 29: {
             auto *np7 = new SetAutoSave(screen, 0, 0, "Auto-save settings...");
+            np7->raise();
+            } break;
+        case 30: {
+            auto *np7 = new SetRefreshRate(screen, 0, 0, "Set video refresh rate...");
             np7->raise();
             } break;
         case 31: if (statusdrive>-1 && statusdrive<DOS_DRIVES && Drives[statusdrive]) {

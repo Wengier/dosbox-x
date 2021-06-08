@@ -16,12 +16,13 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-
+#include <assert.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
+#include <fstream>
 
 #if defined(WIN32)
 #include <conio.h>
@@ -51,6 +52,8 @@ static bool do_LOG_stderr = false;
 
 bool logBuffSuppressConsole = false;
 bool logBuffSuppressConsoleNeedUpdate = false;
+
+int debuggerrun = 0;
 
 _LogGroup loggrp[LOG_MAX]={{"",LOG_NORMAL},{0,LOG_NORMAL}};
 FILE* debuglog = NULL;
@@ -105,6 +108,16 @@ static list<string> logBuff;
 static list<string>::iterator logBuffPos = logBuff.end();
 
 extern int old_cursor_state;
+
+bool savetologfile(const char *name) {
+    std::ofstream out(name);
+    if (!out.is_open()) return false;
+    std::list<string>::iterator it;
+    for (it = logBuff.begin(); it != logBuff.end(); ++it)
+        out << (std::string)(*it) << endl;
+    out.close();
+    return true;
+}
 
 const char *DBGBlock::get_winname(int idx) {
     if (idx >= 0 && idx < DBGBlock::WINI_MAX_INDEX)
@@ -479,7 +492,7 @@ static void MakeSubWindows(void) {
 
             /* add height to the window */
             yheight[wndi] += (unsigned int)expand_by;
-            outy += (int)expand_by;
+            outy += expand_by;
             wndi++;
 
             /* move the others down */
@@ -631,6 +644,7 @@ void DEBUG_ShowMsg(char const* format,...) {
 	va_list msg;
 	size_t len;
 
+    if (format==NULL) return;
     in_debug_showmsg = true;
 
     // in case of runaway error from the CPU core, user responsiveness can be helpful
@@ -681,7 +695,7 @@ void DEBUG_ShowMsg(char const* format,...) {
 		logBuffPos=logBuff.end();
 		DEBUG_RefreshPage(0);
 	}
-	logBuff.push_back(buf);
+	logBuff.emplace_back(buf);
 	if (logBuff.size() > MAX_LOG_BUFFER) {
         logBuffHasDiscarded = true;
         if (logBuffPos == logBuff.begin()) ++logBuffPos; /* keep the iterator valid */
@@ -843,6 +857,14 @@ void LOG::Init() {
 		debuglog=0;
 	}
 
+	const char* debugstr = sect->Get_string("debuggerrun");
+    if (debugstr!=NULL && !strcasecmp(debugstr, "normal"))
+        debuggerrun = 1;
+    else if (debugstr!=NULL && !strcasecmp(debugstr, "watch"))
+        debuggerrun = 2;
+    else
+        debuggerrun = 0;
+
     log_int21 = sect->Get_bool("int21") || control->opt_logint21;
     log_fileio = sect->Get_bool("fileio") || control->opt_logfileio;
 
@@ -936,6 +958,7 @@ void LOG::SetupConfigSection(void) {
 	Prop_string* Pstring = sect->Add_string("logfile",Property::Changeable::Always,"");
 	Pstring->Set_help("file where the log messages will be saved to");
 	Pstring->SetBasic(true);
+
 	char buf[64];
 	for (Bitu i = LOG_ALL + 1;i < LOG_MAX;i++) {
 		safe_strncpy(buf,loggrp[i].front, sizeof(buf));
@@ -953,5 +976,10 @@ void LOG::SetupConfigSection(void) {
 
     Pbool = sect->Add_bool("fileio",Property::Changeable::Always,false);
     Pbool->Set_help("Log file I/O through INT 21h");
-}
 
+	const char* debuggerrunopt[] = { "debugger", "normal", "watch", 0};
+	Pstring = sect->Add_string("debuggerrun",Property::Changeable::OnlyAtStart,"debugger");
+	Pstring->Set_help("The run mode when the DOSBox-X Debugger starts.");
+	Pstring->Set_values(debuggerrunopt);
+	Pstring->SetBasic(true);
+}

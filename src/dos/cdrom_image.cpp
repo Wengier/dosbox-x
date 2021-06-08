@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -111,6 +111,17 @@ CDROM_Interface_Image::BinaryFile::BinaryFile(const char *filename, bool &error)
 	file = new ifstream(filename, ios::in | ios::binary);
 	// If new fails, an exception is generated and scope leaves this constructor
 	error = file->fail();
+#if defined(WIN32) && !defined(__MINGW32__) // Wengier: disable for MinGW for now but it appears to work on my MinGW version
+    if (error) {
+        typedef wchar_t host_cnv_char_t;
+        host_cnv_char_t *CodePageGuestToHost(const char *s);
+        const host_cnv_char_t* host_name = CodePageGuestToHost(filename);
+        if (host_name != NULL) {
+            file = new ifstream(host_name, ios::in | ios::binary);
+            error = file->fail();
+        }
+    }
+#endif
 }
 
 CDROM_Interface_Image::BinaryFile::~BinaryFile()
@@ -123,10 +134,10 @@ CDROM_Interface_Image::BinaryFile::~BinaryFile()
 	file = nullptr;
 }
 
-bool CDROM_Interface_Image::BinaryFile::read(uint8_t *buffer, int offset, int count)
+bool CDROM_Interface_Image::BinaryFile::read(uint8_t *buffer,int64_t offset, int count)
 {
     if (!seek(offset)) return false;
-	file->seekg(offset, ios::beg);
+	file->seekg((streampos)offset, ios::beg);
 	file->read((char*)buffer, count);
 	return !(file->fail());
 }
@@ -149,11 +160,20 @@ uint16_t CDROM_Interface_Image::BinaryFile::getEndian()
 	#endif
 }
 
-bool CDROM_Interface_Image::BinaryFile::seek(uint32_t offset)
+bool CDROM_Interface_Image::BinaryFile::seek(int64_t offset)
 {
-	if (static_cast<uint32_t>(file->tellg()) == offset)
+	const auto pos = static_cast<std::streamoff>(offset);
+	if (file->tellg() == pos)
 		return true;
-	file->seekg(offset, ios::beg);
+
+	file->seekg(pos, std::ios::beg);
+
+	// If the first seek attempt failed, then try harder
+	if (file->fail()) {
+		file->clear();                   // clear fail and eof bits
+		file->seekg(0, std::ios::beg);   // "I have returned."
+		file->seekg(pos, std::ios::beg); // "It will be done."
+	}
 	return !file->fail();
 }
 
@@ -205,13 +225,13 @@ CDROM_Interface_Image::AudioFile::~AudioFile()
  *  or number of channels.  To do this, we convert the byte offset to a
  *  time-offset, and use the Sound_Seek() function to move the read position.
  */
-bool CDROM_Interface_Image::AudioFile::seek(uint32_t offset)
+bool CDROM_Interface_Image::AudioFile::seek(int64_t offset)
 {
 	#ifdef DEBUG
 	const auto begin = std::chrono::steady_clock::now();
 	#endif
 
-	if (audio_pos == offset) {
+	if (audio_pos == (uint32_t)offset) {
 #ifdef DEBUG
 		LOG_MSG("CDROM: seek to %u avoided with position-tracking", offset);
 #endif
@@ -220,7 +240,7 @@ bool CDROM_Interface_Image::AudioFile::seek(uint32_t offset)
 
 	// Convert the byte-offset to a time offset (milliseconds)
 	const bool result = Sound_Seek(sample, lround(offset/176.4f));
-	audio_pos = result ? offset : UINT32_MAX;
+	audio_pos = result ? (uint32_t)offset : UINT32_MAX;
 
 	#ifdef DEBUG
 	const auto end = std::chrono::steady_clock::now();
@@ -321,14 +341,14 @@ void hunk_thread_func(chd_file* chd, int hunk_index, uint8_t* buffer, bool* erro
 }
 #endif
 
-bool CDROM_Interface_Image::CHDFile::read(uint8_t* buffer, int offset, int count)
+bool CDROM_Interface_Image::CHDFile::read(uint8_t* buffer,int64_t offset, int count)
 {
     // we can not read more than a single sector currently
     if (count > RAW_SECTOR_SIZE) {
         return false;
     }
 
-    int needed_hunk = offset / this->header->hunkbytes;
+    uint64_t needed_hunk = (uint64_t)offset / (uint64_t)this->header->hunkbytes;
 
     // EOF
     if (needed_hunk > this->header->totalhunks) {
@@ -336,7 +356,7 @@ bool CDROM_Interface_Image::CHDFile::read(uint8_t* buffer, int offset, int count
     }
 
     // read new hunk if needed
-    if (needed_hunk != this->hunk_buffer_index) {
+    if ((int)needed_hunk != this->hunk_buffer_index) {
 #if defined(HX_DOS) || defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR)
         if (chd_read(this->chd, needed_hunk, this->hunk_buffer) != CHDERR_NONE)
             return false;
@@ -345,28 +365,28 @@ bool CDROM_Interface_Image::CHDFile::read(uint8_t* buffer, int offset, int count
         if (this->hunk_thread) this->hunk_thread->join();
 
         // can we use our prefetched hunk
-        if ((needed_hunk == (this->hunk_buffer_index + 1)) && (!this->hunk_thread_error)) {
+        if (((int)needed_hunk == (this->hunk_buffer_index + 1)) && (!this->hunk_thread_error)) {
             // swap pointers and we're good :)
             std::swap(this->hunk_buffer, this->hunk_buffer_next);
 
         } else {
             // read new hunk
             bool error = true;
-            hunk_thread_func(this->chd, needed_hunk, this->hunk_buffer, &error);
+            hunk_thread_func(this->chd, (int)needed_hunk, this->hunk_buffer, &error);
             if (error) {
                 return false;
             }
         }
 #endif
 
-        this->hunk_buffer_index = needed_hunk;
+        this->hunk_buffer_index = (int)needed_hunk;
 
 #if !defined(HX_DOS) && !(defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR))
         // prefetch: let our thread decode the next hunk
         if (hunk_thread) delete this->hunk_thread;
         this->hunk_thread = new std::thread(
             [this, needed_hunk]() {
-                hunk_thread_func(this->chd, needed_hunk + 1, this->hunk_buffer_next, &this->hunk_thread_error);
+                hunk_thread_func(this->chd, (int)(needed_hunk + 1), this->hunk_buffer_next, &this->hunk_thread_error);
             }
         );
 #endif
@@ -397,11 +417,11 @@ uint16_t CDROM_Interface_Image::CHDFile::getEndian()
 #endif
 }
 
-bool CDROM_Interface_Image::CHDFile::seek(uint32_t offset)
+bool CDROM_Interface_Image::CHDFile::seek(int64_t offset)
 {
     // only checks if seek range is valid ? only used for audio ?
     // only used by PlayAudioSector ?
-    if ((offset / this->header->hunkbytes) < this->header->hunkcount) {
+    if ((uint32_t)((uint64_t)offset / this->header->hunkbytes) < this->header->hunkcount) {
         return true;
     } else {
         return false;
@@ -475,12 +495,13 @@ CDROM_Interface_Image::~CDROM_Interface_Image()
 	}
 }
 
+extern bool qmount;
 bool CDROM_Interface_Image::SetDevice(char* path, int forceCD)
 {
 	(void)forceCD;//UNUSED
 	const bool result = LoadCueSheet(path) || LoadIsoFile(path) || LoadChdFile(path);
-	if (!result) {
-		// print error message on dosbox console
+	if (!result && !qmount) {
+		// print error message on dosbox-x console
 		char buf[MAX_LINE_LENGTH];
 		snprintf(buf, MAX_LINE_LENGTH, "Could not load image file: %s\r\n", path);
 		uint16_t size = (uint16_t)strlen(buf);
@@ -760,7 +781,7 @@ bool CDROM_Interface_Image::ReadSector(uint8_t *buffer, bool raw, unsigned long 
 	int track = GetTrack(sector) - 1;
 	if (track < 0) return false;
 
-	int seek = tracks[track].skip + (sector - tracks[track].start) * tracks[track].sectorSize;
+	int64_t seek = (int64_t)tracks[track].skip + ((int64_t)(sector - tracks[track].start)) * (int64_t)tracks[track].sectorSize;
 	int length = (raw ? RAW_SECTOR_SIZE : COOKED_SECTOR_SIZE);
 	if (tracks[track].sectorSize != RAW_SECTOR_SIZE && raw) return false;
 	if ((tracks[track].sectorSize == RAW_SECTOR_SIZE || tracks[track].sectorSize == 2448) && !tracks[track].mode2 && !raw) seek += 16;
@@ -835,7 +856,10 @@ void CDROM_Interface_Image::CDAudioCallBack(Bitu len)
 				// uses either the stereo or mono and native or nonnative AddSamples call assigned during construction
 				(player.channel->*player.addSamples)(requested / bytes_per_request, (int16_t*)(player.buffer + player.bufferConsumed) );
 				player.bufferConsumed += requested;
+
 				player.playbackRemaining -= requested;
+				if (player.playbackRemaining < 0)
+					player.playbackRemaining = 0;
 
 				// Games can query the current Red Book MSF frame-position, so we keep that up-to-date here.
 				// We scale the final number of frames by the percent complete, which
@@ -931,7 +955,7 @@ bool CDROM_Interface_Image::LoadIsoFile(char* filename)
 		return false;
 	}
     int64_t len=track.file->getLength();
-	track.length = len / track.sectorSize;
+	track.length = (int)(len / track.sectorSize);
 	// LOG_MSG("LoadIsoFile: %s, track 1, 0x40, sectorSize=%d, mode2=%s", filename, track.sectorSize, track.mode2 ? "true":"false");
 
 	tracks.push_back(track);
@@ -1284,7 +1308,7 @@ bool CDROM_Interface_Image::AddTrack(Track &curr, int &shift, int prestart, int 
 	} else {
 		if (!prev.length) {
 			int64_t tmp = prev.file->getLength() - prev.skip;
-			prev.length = tmp / prev.sectorSize;
+			prev.length = (int)(tmp / prev.sectorSize);
 			if (tmp % prev.sectorSize != 0) prev.length++; // padding
 		}
 		curr.start += prev.start + prev.length + currPregap;

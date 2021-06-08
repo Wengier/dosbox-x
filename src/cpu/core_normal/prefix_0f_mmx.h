@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -225,7 +225,7 @@
 		if (CPU_ArchitectureType<CPU_ARCHTYPE_PMMXSLOW) goto illegal_opcode;
 		GetRM;
 		uint8_t op=(rm>>3)&7;
-		uint8_t shift=Fetchb();
+		uint8_t shift=(uint8_t)Fetchb();
 		MMX_reg* dest=reg_mmx[rm&7];
 		switch (op) {
 			case 0x06: 	/*PSLLW*/
@@ -338,7 +338,7 @@
 		if (CPU_ArchitectureType<CPU_ARCHTYPE_PMMXSLOW) goto illegal_opcode;
 		GetRM;
 		uint8_t op=(rm>>3)&7;
-		uint8_t shift=Fetchb();
+		uint8_t shift=(uint8_t)Fetchb();
 		MMX_reg* dest=reg_mmx[rm&7];
 		switch (op) {
 			case 0x06: 	/*PSLLD*/
@@ -409,7 +409,7 @@
 	{
 		if (CPU_ArchitectureType<CPU_ARCHTYPE_PMMXSLOW) goto illegal_opcode;
 		GetRM;
-		uint8_t shift=Fetchb();
+		uint8_t shift=(uint8_t)Fetchb();
 		MMX_reg* dest=reg_mmx[rm&7];
 		if (shift > 63) dest->q = 0;
 		else {
@@ -1028,6 +1028,7 @@
 		dest->ub.b3 = src.ub.b1;
 		dest->ub.b2 = dest->ub.b1;
 		dest->ub.b1 = src.ub.b0;
+		dest->ub.b0 = dest->ub.b0;
 		break;
 	}
 	CASE_0F_MMX(0x61)												/* PUNPCKLWD Pq,Qq */
@@ -1045,6 +1046,7 @@
 		dest->uw.w3 = src.uw.w1;
 		dest->uw.w2 = dest->uw.w1;
 		dest->uw.w1 = src.uw.w0;
+		dest->uw.w0 = dest->uw.w0;
 		break;
 	}
 	CASE_0F_MMX(0x62)												/* PUNPCKLDQ Pq,Qq */

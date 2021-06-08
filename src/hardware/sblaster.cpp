@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -46,11 +46,12 @@
 # pragma warning(disable:4065) /* switch without case */
 #endif
 
+#include <assert.h>
 #include <iomanip>
 #include <sstream>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h> 
+#include <math.h>
 #include "dosbox.h"
 #include "inout.h"
 #include "mixer.h"
@@ -369,7 +370,7 @@ static void DSP_SetSpeaker(bool how) {
         PIC_RemoveEvents(DMA_Silent_Event);
         CheckDMAEnd();
     } else {
-        
+        ;
     }
 }
 
@@ -478,7 +479,7 @@ static INLINE uint8_t decode_ADPCM_4_sample(uint8_t sample,uint8_t & reference,B
 
     Bits samp = sample + scale;
 
-    if ((samp < 0) || (samp > 63)) { 
+    if ((samp < 0) || (samp > 63)) {
         LOG(LOG_SB,LOG_ERROR)("Bad ADPCM-4 sample");
         if(samp < 0 ) samp =  0;
         if(samp > 63) samp = 63;
@@ -489,7 +490,7 @@ static INLINE uint8_t decode_ADPCM_4_sample(uint8_t sample,uint8_t & reference,B
     else if (ref < 0x00) reference = 0x00;
     else reference = (uint8_t)(ref&0xff);
     scale = (scale + adjustMap[samp]) & 0xff;
-    
+
     return reference;
 }
 
@@ -523,7 +524,7 @@ static INLINE uint8_t decode_ADPCM_2_sample(uint8_t sample,uint8_t & reference,B
 }
 
 INLINE uint8_t decode_ADPCM_3_sample(uint8_t sample,uint8_t & reference,Bits& scale) {
-    static const int8_t scaleMap[40] = { 
+    static const int8_t scaleMap[40] = {
         0,  1,  2,  3,  0,  -1,  -2,  -3,
         1,  3,  5,  7, -1,  -3,  -5,  -7,
         2,  6, 10, 14, -2,  -6, -10, -14,
@@ -605,7 +606,7 @@ static void GenerateDMASound(Bitu size) {
     if(sb.dma.autoinit) {
         if (sb.dma.left <= size) size = sb.dma.left;
     } else {
-        if (sb.dma.left <= sb.dma.min) 
+        if (sb.dma.left <= sb.dma.min)
             size = sb.dma.left;
     }
 
@@ -666,7 +667,7 @@ static void GenerateDMASound(Bitu size) {
             read=sb.dma.chan->Read(size,&sb.dma.buf.b8[sb.dma.remain_size]);
             Bitu total=read+sb.dma.remain_size;
             if (!sb.dma.sign)  sb.chan->AddSamples_s8(total>>1,sb.dma.buf.b8);
-            else sb.chan->AddSamples_s8s(total>>1,(int8_t*)sb.dma.buf.b8); 
+            else sb.chan->AddSamples_s8s(total>>1,(int8_t*)sb.dma.buf.b8);
             if (total&1) {
                 sb.dma.remain_size=1;
                 sb.dma.buf.b8[0]=sb.dma.buf.b8[total-1];
@@ -683,7 +684,7 @@ static void GenerateDMASound(Bitu size) {
             /* In DSP_DMA_16_ALIASED mode temporarily divide by 2 to get number of 16-bit
                samples, because 8-bit DMA Read returns byte size, while in DSP_DMA_16 mode
                16-bit DMA Read returns word size */
-            read=sb.dma.chan->Read(size,(uint8_t *)&sb.dma.buf.b16[sb.dma.remain_size]) 
+            read=sb.dma.chan->Read(size,(uint8_t *)&sb.dma.buf.b16[sb.dma.remain_size])
                 >> (sb.dma.mode==DSP_DMA_16_ALIASED ? 1:0);
             Bitu total=read+sb.dma.remain_size;
 #if defined(WORDS_BIGENDIAN)
@@ -698,7 +699,7 @@ static void GenerateDMASound(Bitu size) {
                 sb.dma.buf.b16[0]=sb.dma.buf.b16[total-1];
             } else sb.dma.remain_size=0;
         } else {
-            read=sb.dma.chan->Read(size,(uint8_t *)sb.dma.buf.b16) 
+            read=sb.dma.chan->Read(size,(uint8_t *)sb.dma.buf.b16)
                 >> (sb.dma.mode==DSP_DMA_16_ALIASED ? 1:0);
 #if defined(WORDS_BIGENDIAN)
             if (sb.dma.sign) sb.chan->AddSamples_m16_nonnative(read,sb.dma.buf.b16);
@@ -1295,7 +1296,7 @@ static void DSP_ChangeRate(Bitu freq) {
 Bitu DEBUG_EnableDebugger(void);
 
 #define DSP_SB16_ONLY if (sb.type != SBT_16) { LOG(LOG_SB,LOG_ERROR)("DSP:Command %2X requires SB16",sb.dsp.cmd); break; }
-#define DSP_SB2_ABOVE if (sb.type <= SBT_1) { LOG(LOG_SB,LOG_ERROR)("DSP:Command %2X requires SB2 or above",sb.dsp.cmd); break; } 
+#define DSP_SB2_ABOVE if (sb.type <= SBT_1) { LOG(LOG_SB,LOG_ERROR)("DSP:Command %2X requires SB2 or above",sb.dsp.cmd); break; }
 
 static unsigned int ESS_DMATransferCount() {
     unsigned int r;
@@ -1757,11 +1758,13 @@ static void DSP_DoCommand(void) {
         break;
     case 0x75:  /* 075h : Single Cycle 4-bit ADPCM Reference */
         sb.adpcm.haveref=true;
-    case 0x74:  /* 074h : Single Cycle 4-bit ADPCM */   
+        /* FALLTHROUGH */
+    case 0x74:  /* 074h : Single Cycle 4-bit ADPCM */
         DSP_PrepareDMA_Old(DSP_DMA_4,false,false,false);
         break;
     case 0x77:  /* 077h : Single Cycle 3-bit(2.6bit) ADPCM Reference*/
         sb.adpcm.haveref=true;
+        /* FALLTHROUGH */
     case 0x76:  /* 074h : Single Cycle 3-bit(2.6bit) ADPCM */
         DSP_PrepareDMA_Old(DSP_DMA_3,false,false,false);
         break;
@@ -1782,6 +1785,7 @@ static void DSP_DoCommand(void) {
         break;
     case 0x17:  /* 017h : Single Cycle 2-bit ADPCM Reference*/
         sb.adpcm.haveref=true;
+        /* FALLTHROUGH */
     case 0x16:  /* 074h : Single Cycle 2-bit ADPCM */
         DSP_PrepareDMA_Old(DSP_DMA_2,false,false,false);
         break;
@@ -2017,10 +2021,10 @@ static void DSP_DoCommand(void) {
         break;
     case 0xf2:  /* Trigger 8bit IRQ */
         //Small delay in order to emulate the slowness of the DSP, fixes Llamatron 2012 and Lemmings 3D
-        PIC_AddEvent(&DSP_RaiseIRQEvent,0.01f); 
+        PIC_AddEvent(&DSP_RaiseIRQEvent,0.01f);
         break;
     case 0xf3:   /* Trigger 16bit IRQ */
-        DSP_SB16_ONLY; 
+        DSP_SB16_ONLY;
         SB_RaiseIRQ(SB_IRQ_16);
         break;
     case 0xf8:  /* Undocumented, pre-SB16 only */
@@ -3292,7 +3296,8 @@ private:
         sb.reveal_sc_type = RSC_NONE;
         sb.ess_extended_mode = false;
         const char * sbtype=config->Get_string("sbtype");
-        if (!strcasecmp(sbtype,"sb1")) type=SBT_1;
+        if (control->opt_silent) type = SBT_NONE;
+        else if (!strcasecmp(sbtype,"sb1")) type=SBT_1;
         else if (!strcasecmp(sbtype,"sb2")) type=SBT_2;
         else if (!strcasecmp(sbtype,"sbpro1")) type=SBT_PRO1;
         else if (!strcasecmp(sbtype,"sbpro2")) type=SBT_PRO2;
@@ -3336,7 +3341,7 @@ private:
 
         /* OPL/CMS Init */
         const char * omode=config->Get_string("oplmode");
-        if (!strcasecmp(omode,"none")) opl_mode=OPL_none;   
+        if (!strcasecmp(omode,"none")) opl_mode=OPL_none;
         else if (!strcasecmp(omode,"cms")) opl_mode=OPL_cms;
         else if (!strcasecmp(omode,"opl2")) opl_mode=OPL_opl2;
         else if (!strcasecmp(omode,"dualopl2")) opl_mode=OPL_dualopl2;
@@ -3499,6 +3504,12 @@ public:
 
         sb.dsp.command_aliases=section->Get_bool("dsp command aliases");
 
+        Find_Type_And_Opl(section,sb.type,oplmode);
+        if (sb.hw.irq == 0) {
+            std::string GetSBtype(), sbtype=GetSBtype();
+            sb.hw.irq=sbtype=="SBPro 2"||sbtype=="SB16"||IS_PC98_ARCH?5:7;
+        }
+
         /* some DOS games/demos support Sound Blaster, and expect the IRQ to fire, but
          * make no attempt to unmask the IRQ (perhaps the programmer forgot). This option
          * is needed for Public NMI "jump" demo in order for music to continue playing. */
@@ -3522,9 +3533,8 @@ public:
             sb.mixer.stereo=true;
         }
 
-        Find_Type_And_Opl(section,sb.type,oplmode);
         bool isCMSpassthrough = false;
-    
+
         switch (oplmode) {
         case OPL_none:
             if (!IS_PC98_ARCH)
@@ -3565,7 +3575,7 @@ public:
         for (i=4;i<=0xf;i++) {
             if (i==8 || i==9) continue;
             //Disable mixer ports for lower soundblaster
-            if ((sb.type==SBT_1 || sb.type==SBT_2) && (i==4 || i==5)) continue; 
+            if ((sb.type==SBT_1 || sb.type==SBT_2) && (i==4 || i==5)) continue;
             ReadHandler[i].Install(sb.hw.base+(IS_PC98_ARCH ? ((i+0x20u) << 8u) : i),read_sb,IO_MB);
             WriteHandler[i].Install(sb.hw.base+(IS_PC98_ARCH ? ((i+0x20u) << 8u) : i),write_sb,IO_MB);
         }
@@ -3584,7 +3594,7 @@ public:
         CTMIXER_Reset();
 
         // The documentation does not specify if SB gets initialized with the speaker enabled
-        // or disabled. Real SBPro2 has it disabled. 
+        // or disabled. Real SBPro2 has it disabled.
         sb.speaker=false;
         // On SB16 the speaker flag does not affect actual speaker state.
         if (sb.type == SBT_16 || sb.ess_type != ESS_NONE || sb.reveal_sc_type != RSC_NONE) sb.chan->Enable(true);
@@ -3777,7 +3787,7 @@ ASP>
         /* Soundblaster midi interface */
         if (!MIDI_Available()) sb.midi = false;
         else sb.midi = true;
-    }   
+    }
 
     void DOS_Shutdown() { /* very likely, we're booting into a guest OS where our environment variable has no meaning anymore */
         autoexecline.Uninstall();
@@ -3832,8 +3842,8 @@ ASP>
             break;
         }
         if (sb.type==SBT_NONE || sb.type==SBT_GB) return;
-        DSP_Reset(); // Stop everything 
-    }   
+        DSP_Reset(); // Stop everything
+    }
 }; //End of SBLASTER class
 
 std::string GetSBtype() {
@@ -3863,16 +3873,16 @@ std::string GetSBbase() {
     return ss.str();
 }
 
-Bitu GetSBirq() {
-    return sb.hw.irq;
+std::string GetSBirq() {
+    return sb.hw.irq==0xff?"None":std::to_string(sb.hw.irq);
 }
 
-uint8_t GetSBldma() {
-    return sb.hw.dma8;
+std::string GetSBldma() {
+    return sb.hw.dma8==0xff?"None":std::to_string(sb.hw.dma8);
 }
 
-uint8_t GetSBhdma() {
-    return sb.hw.dma16;
+std::string GetSBhdma() {
+    return sb.hw.dma16==0xff?"None":std::to_string(sb.hw.dma16);
 }
 
 extern void HWOPL_Cleanup();
@@ -3885,7 +3895,7 @@ void SBLASTER_DOS_Shutdown() {
 
 void SBLASTER_ShutDown(Section* /*sec*/) {
     if (test != NULL) {
-        delete test;    
+        delete test;
         test = NULL;
     }
     HWOPL_Cleanup();
@@ -3896,7 +3906,7 @@ void SBLASTER_OnReset(Section *sec) {
     SBLASTER_DOS_Shutdown();
 
     if (test != NULL) {
-        delete test;    
+        delete test;
         test = NULL;
     }
     HWOPL_Cleanup();

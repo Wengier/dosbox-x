@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -400,6 +400,7 @@
 				SETFLAGBIT(CF,(*earw & mask));
 			} else {
 				GetEAa;eaa+=(PhysPt)((((int16_t)*rmrw)>>4)*2);
+				if (!TEST_PREFIX_ADDR) FixEA16;
 				uint16_t old=LoadMw(eaa);
 				SETFLAGBIT(CF,(old & mask));
 			}
@@ -431,6 +432,7 @@
 				*earw|=mask;
 			} else {
 				GetEAa;eaa+=(PhysPt)((((int16_t)*rmrw)>>4)*2);
+				if (!TEST_PREFIX_ADDR) FixEA16;
 				uint16_t old=LoadMw(eaa);
 				SETFLAGBIT(CF,(old & mask));
 				SaveMw(eaa,old | mask);
@@ -526,6 +528,7 @@
 				*earw&= ~mask;
 			} else {
 				GetEAa;eaa+=(PhysPt)((((int16_t)*rmrw)>>4)*2);
+				if (!TEST_PREFIX_ADDR) FixEA16;
 				uint16_t old=LoadMw(eaa);
 				SETFLAGBIT(CF,(old & mask));
 				SaveMw(eaa,old & ~mask);
@@ -625,6 +628,7 @@
 				*earw^=mask;
 			} else {
 				GetEAa;eaa+=(PhysPt)((((int16_t)*rmrw)>>4)*2);
+				if (!TEST_PREFIX_ADDR) FixEA16;
 				uint16_t old=LoadMw(eaa);
 				SETFLAGBIT(CF,(old & mask));
 				SaveMw(eaa,old ^ mask);

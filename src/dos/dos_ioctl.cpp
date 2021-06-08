@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -754,7 +754,6 @@ bool DOS_IOCTL(void) {
 				return false;
 			}
 		}
-		break;
 	case 0x0E:			/* Get Logical Drive Map */
 		if (drive < 2) {
 			if (Drives[drive]) reg_al=drive+1;

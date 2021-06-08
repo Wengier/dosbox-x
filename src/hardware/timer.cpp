@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,7 +16,7 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
-
+#include <assert.h>
 #include <math.h>
 #include "dosbox.h"
 #include "inout.h"
@@ -219,7 +219,6 @@ struct PIT_Block {
                 if (new_mode) return false;
                 if (res.cycle != 0u/*index > delay*/) return true;
                 else return false;
-                break;
             case 2:
                 if (new_mode) return true;
                 return res.counter != 0;
@@ -329,7 +328,7 @@ static void PIT0_Event(Bitu /*val*/) {
 }
 
 uint32_t PIT0_GetAssignedCounter(void) {
-    return pit[0].cntr;
+    return (uint32_t)pit[0].cntr;
 }
 
 static bool counter_output(Bitu counter) {

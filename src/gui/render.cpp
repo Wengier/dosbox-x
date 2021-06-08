@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -1232,6 +1232,26 @@ void RENDER_Init() {
 
 	MAPPER_AddHandler(&AspectRatio_mapper_shortcut, MK_nothing, 0, "aspratio", "Fit to aspect ratio", &item);
 	item->set_text("Fit to aspect ratio");
+
+	if (machine==MCH_HERC || machine==MCH_MDA) {
+		void HercBlend(bool pressed), CycleHercPal(bool pressed);
+		MAPPER_AddHandler(CycleHercPal,MK_f7,MMOD1,"hercpal","Hercules Palette");
+		MAPPER_AddHandler(HercBlend,MK_f8,MMOD1,"hercblend","Hercules Blending");
+	}
+
+	if (machine==MCH_CGA || machine==MCH_MCGA || machine==MCH_AMSTRAD) {
+		if(!mono_cga) {
+            void IncreaseHue(bool pressed), DecreaseHue(bool pressed), CGAModel(bool pressed), Composite(bool pressed);
+            MAPPER_AddHandler(DecreaseHue,MK_f7,MMOD1|MMOD3,"dechue","Decrease Hue");
+            MAPPER_AddHandler(IncreaseHue,MK_f8,MMOD1|MMOD3,"inchue","Increase Hue");
+            MAPPER_AddHandler(CGAModel,MK_f7,MMOD1,"cgamodel","Early/Late CGA");
+            MAPPER_AddHandler(Composite,MK_f8,MMOD1,"cgacomp","CGA Composite");
+        } else {
+            void CycleMonoCGAPal(bool pressed), CycleMonoCGABright(bool pressed);
+            MAPPER_AddHandler(CycleMonoCGAPal,MK_f7,MMOD1,"monocgapal","Mono CGA Palette");
+            MAPPER_AddHandler(CycleMonoCGABright,MK_f8,MMOD1,"monocgabri","Mono CGA Brightness");
+        }
+	}
 
     mainMenu.get_item("vga_9widetext").check(vga.draw.char9_set).refresh_item(mainMenu);
     mainMenu.get_item("doublescan").check(vga.draw.doublescan_set).refresh_item(mainMenu);

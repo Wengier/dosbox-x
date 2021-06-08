@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -36,6 +36,7 @@
 #include "serialport.h"
 #include "mapper.h"
 #include "vga.h"
+#include "jfont.h"
 #include "shiftjis.h"
 #include "pc98_gdc.h"
 #include "pc98_gdc_const.h"
@@ -99,6 +100,7 @@ void pc98_update_palette(void);
 bool MEM_map_ROM_alias_physmem(Bitu start,Bitu end);
 void MOUSE_Startup(Section *sec);
 void runBoot(const char *str);
+void SetIMPosition(void);
 #if defined(USE_TTF)
 bool TTF_using(void);
 void ttf_switch_on(bool ss), ttf_switch_off(bool ss), ttf_setlines(int cols, int lins);
@@ -2969,6 +2971,8 @@ void draw_pc98_function_row_elem(unsigned int o, unsigned int co, const struct p
 }
 
 void draw_pc98_function_row(unsigned int o, const struct pc98_func_key_shortcut_def* keylist) {
+    mem_writew(0xA0000+((o+1)*2),real_readb(0x60,0x8B));
+    mem_writeb(0xA2000+((o+1)*2),0xE1);
     for (unsigned int i=0u;i < 5u;i++)
         draw_pc98_function_row_elem(o,4u + (i * 7u),keylist[i]);
     for (unsigned int i=5u;i < 10u;i++)
@@ -2998,6 +3002,9 @@ void update_pc98_function_row(unsigned char setting,bool force_redraw) {
         }
     }
 
+    /* update mode 2 indicator */
+    real_writeb(0x60,0x8C,(pc98_function_row_mode == 2) ? '*' : ' ');
+
     real_writeb(0x60,0x112,total_rows - 1 - ((pc98_function_row_mode != 0) ? 1 : 0));
 
     if (pc98_function_row_mode == 2) {
@@ -3021,7 +3028,7 @@ void update_pc98_function_row(unsigned char setting,bool force_redraw) {
                 i++;
         }
 
-        mem_writew(0xA0000+((o+2)*2),(unsigned char)('*'));
+        mem_writew(0xA0000+((o+2)*2),real_readb(0x60,0x8C));
         mem_writeb(0xA2000+((o+2)*2),0xE1);
 
         draw_pc98_function_row(o,pc98_func_key_shortcut);
@@ -3071,6 +3078,16 @@ void pc98_function_row_user_toggle(void) {
         update_pc98_function_row(0,true);
     else
         update_pc98_function_row(pc98_function_row_mode+1,true);
+}
+
+void pc98_set_char_mode(bool mode) {
+    real_writeb(0x60,0x8A,mode);
+    real_writeb(0x60,0x8B,(mode == true) ? ' ' : 'g');
+    update_pc98_function_row(pc98_function_row_mode,true);
+}
+
+void pc98_toggle_char_mode(void) {
+    pc98_set_char_mode(!real_readb(0x60,0x8A));
 }
 
 void pc98_set_digpal_entry(unsigned char ent,unsigned char grb);
@@ -5148,8 +5165,8 @@ static Bitu INTDC_PC98_Handler(void) {
                  * DL is the attribute byte (in the format written directly to video RAM, not the ANSI code)
                  *
                  * NTS: Reverse engineering INT DCh shows it sets both 71Dh and 73Ch as below */
-                mem_writeb(0x71D,reg_dl);   /* 60:11D */
-                mem_writeb(0x73C,reg_dx);   /* 60:13C */
+                real_writeb(0x60,0x11D,reg_dl);
+                real_writeb(0x60,0x13C,reg_dx);
                 goto done;
             }
             else if (reg_ah == 0x03) { /* CL=0x10 AH=0x03 DL=X-coord DH=Y-coord set cursor position */
@@ -5494,6 +5511,18 @@ static Bitu INT8_Handler(void) {
     }
     mem_writed(BIOS_TIMER,value);
 
+	if(bootdrive>=0) {
+#if defined(WIN32) && !defined(HX_DOS) && !defined(C_SDL2) && defined(SDL_DOSBOX_X_SPECIAL)
+        SetIMPosition();
+#endif
+    } else if (IS_DOSV && DOSV_CheckCJKVideoMode()) {
+		INT8_DOSV();
+    } else if (IS_DOS_CJK) {
+#if defined(WIN32) && !defined(HX_DOS) && !defined(C_SDL2) && defined(SDL_DOSBOX_X_SPECIAL)
+        SetIMPosition();
+#endif
+    }
+
     /* decrease floppy motor timer */
     uint8_t val = mem_readb(BIOS_DISK_MOTOR_TIMEOUT);
     if (val) mem_writeb(BIOS_DISK_MOTOR_TIMEOUT,val-1);
@@ -5537,6 +5566,23 @@ static Bitu INT17_Handler(void) {
         if(parallelPortObjects[reg_dx] != 0)
             reg_ah=parallelPortObjects[reg_dx]->getPrinterStatus();
         //LOG_MSG("printer status: %x",reg_ah);
+        break;
+    case 0x20:		/* Some sort of printerdriver install check*/
+        break;
+    case 0x50: // Printer BIOS for AX
+        if (!IS_JEGA_ARCH) break;
+        switch (reg_al) {
+        case 0x00:// Set JP/US mode in PRT BIOS
+            LOG(LOG_BIOS, LOG_NORMAL)("AX PRT BIOS 5000h is called. (not implemented)");
+            reg_al = 0x01; // Return error (not implemented)
+            break;
+        case 0x01:// Get JP/US mode in PRT BIOS
+            reg_al = 0x01; // Return US mode (not implemented)
+            break;
+        default:
+            LOG(LOG_BIOS, LOG_ERROR)("Unhandled AX Function 50%2X", reg_al);
+            break;
+        }
         break;
     }
     return CBRET_NONE;
@@ -5694,6 +5740,7 @@ unsigned char KEYBOARD_AUX_DevStatus();
 unsigned char KEYBOARD_AUX_Resolution();
 unsigned char KEYBOARD_AUX_SampleRate();
 void KEYBOARD_ClrBuffer(void);
+void KEYBOARD_AUX_LowerIRQ();
 
 static Bitu INT15_Handler(void) {
     if( ( machine==MCH_AMSTRAD ) && ( reg_ah<0x07 ) ) {
@@ -5750,7 +5797,33 @@ static Bitu INT15_Handler(void) {
     }
     switch (reg_ah) {
     case 0x06:
-        LOG(LOG_BIOS,LOG_NORMAL)("INT15 Unkown Function 6 (Amstrad?)");
+        LOG(LOG_BIOS,LOG_NORMAL)("INT15 Unknown Function 6 (Amstrad?)");
+        break;
+    case 0x24:      //A20 stuff
+        switch (reg_al) {
+        case 0: //Disable a20
+            MEM_A20_Enable(false);
+            reg_ah = 0;                   //call successful
+            CALLBACK_SCF(false);             //clear on success
+            break;
+        case 1: //Enable a20
+            MEM_A20_Enable( true );
+            reg_ah = 0;                   //call successful
+            CALLBACK_SCF(false);             //clear on success
+            break;
+        case 2: //Query a20
+            reg_al = MEM_A20_Enabled() ? 0x1 : 0x0;
+            reg_ah = 0;                   //call successful
+            CALLBACK_SCF(false);
+            break;
+        case 3: //Get a20 support
+            reg_bx = 0x3;       //Bitmask, keyboard and 0x92
+            reg_ah = 0;         //call successful
+            CALLBACK_SCF(false);
+            break;
+        default:
+            goto unhandled;
+        }
         break;
     case 0xC0:  /* Get Configuration*/
         CPU_SetSegGeneral(es,biosConfigSeg);
@@ -6000,8 +6073,15 @@ static Bitu INT15_Handler(void) {
                     KEYBOARD_AUX_Write(0xFF);
                     Mouse_SetPS2State(false);
                     KEYBOARD_ClrBuffer();
-                    reg_bx=0x00aa;  // mouse
-                    // fall through
+                    reg_bx=0x00aa;  // mouse (BH=device ID  BL=value returned by attached device after reset) [http://www.ctyme.com/intr/rb-1597.htm]
+                    LOG_MSG("INT 15h mouse reset\n");
+                    KEYBOARD_AUX_Write(0xF6); /* set defaults */
+                    Mouse_SetPS2State(false);
+                    KEYBOARD_ClrBuffer();
+                    KEYBOARD_AUX_LowerIRQ(); /* HACK: Lower IRQ or else it will persist, which can cause problems with Windows 3.1 stock PS/2 mouse drivers */
+                    CALLBACK_SCF(false);
+                    reg_ah=0; // must return success. Fall through was well intended but, no, causes an error code that confuses mouse drivers
+                    break;
                 case 0x05:      // initialize
                     if (reg_bh >= 3 && reg_bh <= 4) {
                         /* TODO: BIOSes remember this value as the number of bytes to store before
@@ -6039,7 +6119,7 @@ static Bitu INT15_Handler(void) {
                 case 0x02: {        // set sampling rate
                     static const unsigned char tbl[7] = {10,20,40,60,80,100,200};
                     KEYBOARD_AUX_Write(0xF3);
-                    if (reg_bl > 6) reg_bl = 6;
+                    if (reg_bh > 6) reg_bh = 6;
                     KEYBOARD_AUX_Write(tbl[reg_bh]);
                     KEYBOARD_ClrBuffer();
                     CALLBACK_SCF(false);
@@ -6054,6 +6134,7 @@ static Bitu INT15_Handler(void) {
                     break;
                 case 0x04:      // get type
                     reg_bh=KEYBOARD_AUX_GetType();  // ID
+                    KEYBOARD_AUX_LowerIRQ(); /* HACK: Lower IRQ or else it will persist, which can cause problems with Windows 3.1 stock PS/2 mouse drivers */
                     LOG_MSG("INT 15h reporting mouse device ID 0x%02x\n",reg_bh);
                     KEYBOARD_ClrBuffer();
                     CALLBACK_SCF(false);
@@ -6068,6 +6149,7 @@ static Bitu INT15_Handler(void) {
                         reg_bx=KEYBOARD_AUX_DevStatus();
                         reg_cx=KEYBOARD_AUX_Resolution();
                         reg_dx=KEYBOARD_AUX_SampleRate();
+                        KEYBOARD_AUX_LowerIRQ(); /* HACK: Lower IRQ or else it will persist, which can cause problems with Windows 3.1 stock PS/2 mouse drivers */
                         KEYBOARD_ClrBuffer();
                         reg_ah=0;
                     }
@@ -6540,6 +6622,7 @@ static Bitu INT15_Handler(void) {
                 }
                 break;
             default:
+            unhandled:
                 LOG(LOG_BIOS,LOG_ERROR)("INT15:Unknown call ah=E8, al=%2X",reg_al);
                 reg_ah=0x86;
                 CALLBACK_SCF(true);
@@ -6876,11 +6959,11 @@ void DrawDOSBoxLogoVGA(unsigned int x,unsigned int y) {
 
 static int bios_pc98_posx = 0;
 
-static void BIOS_Int10RightJustifiedPrint(const int x,int &y,const char *msg) {
+static void BIOS_Int10RightJustifiedPrint(const int x,int &y,const char *msg, bool boxdraw = false, bool tobold = false) {
     if (control->opt_fastlaunch) return;
     const char *s = msg;
-
     if (machine != MCH_PC98) {
+        unsigned int bold = 0;
         while (*s != 0) {
             if (*s == '\n') {
                 y++;
@@ -6892,8 +6975,28 @@ static void BIOS_Int10RightJustifiedPrint(const int x,int &y,const char *msg) {
                 s++;
             }
             else {
-                reg_eax = 0x0E00u | ((unsigned char)(*s++));
-                reg_ebx = 0x07u;
+                if (tobold&&!bold) {
+                    if (strlen(s)>3&&!strncmp(s, "DEL", 3)||!strncmp(s, "ESC", 3)) bold = 3;
+                    else if (strlen(s)>5&&!strncmp(s, "ENTER", 5)) bold = 5;
+                    else if (strlen(s)>8&&!strncmp(s, "SPACEBAR", 8)) bold = 8;
+                }
+                if (bold>0) {
+                    bold--;
+                    reg_eax = 0x0900u | ((unsigned char)(*s++));
+                    reg_ebx = 0x000fu;
+                    reg_ecx = 0x0001u;
+                    CALLBACK_RunRealInt(0x10);
+                    reg_eax = 0x0300u;
+                    reg_ebx = 0x0000u;
+                    CALLBACK_RunRealInt(0x10);
+                    reg_eax = 0x0200u;
+                    reg_ebx = 0x0000u;
+                    reg_edx++;
+                    CALLBACK_RunRealInt(0x10);
+                } else {
+                    reg_eax = 0x0E00u | ((unsigned char)(*s++));
+                    reg_ebx = 0x07u;
+                }
                 CALLBACK_RunRealInt(0x10);
             }
         }
@@ -6915,10 +7018,20 @@ static void BIOS_Int10RightJustifiedPrint(const int x,int &y,const char *msg) {
             }
             else {
                 bo = (((unsigned int)y * 80u) + (unsigned int)(bios_pc98_posx++)) * 2u; /* NTS: note the post increment */
-
-                mem_writew(0xA0000+bo,(unsigned char)(*s++));
+                if (boxdraw) {
+                    unsigned int ch = (unsigned char)*s;
+                    if (*s=='อ') ch = 0x250B;
+                    else if (*s=='บ') ch = 0x270B;
+                    else if (*s=='ษ') ch = 0x330B;
+                    else if (*s=='ป') ch = 0x370B;
+                    else if (*s=='ศ') ch = 0x3B0B;
+                    else if (*s=='ผ') ch = 0x3F0B;
+                    mem_writew(0xA0000+bo,ch);
+                } else
+                    mem_writew(0xA0000+bo,(unsigned char)*s);
                 mem_writeb(0xA2000+bo,0xE1);
 
+                s++;
                 bo += 2; /* and keep the cursor following the text */
             }
 
@@ -6930,9 +7043,9 @@ static void BIOS_Int10RightJustifiedPrint(const int x,int &y,const char *msg) {
 }
 
 char *getSetupLine(const char *capt, const char *cont) {
-    unsigned int pad1=25-strlen(capt), pad2=41-strlen(cont);
+    unsigned int pad1=(unsigned int)(25-strlen(capt)), pad2=(unsigned int)(41-strlen(cont));
     static char line[90];
-    sprintf(line, machine == MCH_PC98?"|%*c%s%*c%s%*c|":"บ%*c%s%*c%s%*cบ", 12, ' ', capt, pad1, ' ', cont, pad2, ' ');
+    sprintf(line, "บ%*c%s%*c%s%*cบ", 12, ' ', capt, pad1, ' ', cont, pad2, ' ');
     return line;
 }
 
@@ -7055,14 +7168,6 @@ int oldcols = 0, oldlins = 0;
 void showBIOSSetup(const char* card, int x, int y) {
     reg_eax = 3;        // 80x25 text
     CALLBACK_RunRealInt(0x10);
-#if defined(USE_TTF)
-    if (TTF_using() && (ttf.cols != 80 || ttf.lins != 25)) {
-        oldcols = ttf.cols;
-        oldlins = ttf.lins;
-        ttf_setlines(80, 25);
-    } else
-        oldcols = oldlins = 0;
-#endif
     if (machine == MCH_PC98) {
         for (unsigned int i=0;i < (80*400);i++) {
             mem_writeb(0xA8000+i,0);        // B
@@ -7086,22 +7191,26 @@ void showBIOSSetup(const char* card, int x, int y) {
         reg_eax = 0x0600u;
         reg_ebx = 0x1e00u;
         reg_ecx = 0x0000u;
-        reg_edx = 0x184Fu;
+        reg_edx =
+#if defined(USE_TTF)
+        TTF_using()?(ttf.lins-1)*0x100+(ttf.cols-1):
+#endif
+        0x184Fu;
         CALLBACK_RunRealInt(0x10);
     }
+#if defined(USE_TTF)
+    if (TTF_using() && (ttf.cols != 80 || ttf.lins != 25)) ttf_setlines(80, 25);
+#endif
     char title[]="                               BIOS Setup Utility                               ";
     char *p=machine == MCH_PC98?title+2:title;
     BIOS_Int10RightJustifiedPrint(x,y,p);
-    if (machine == MCH_PC98)
-        BIOS_Int10RightJustifiedPrint(x,y,"+------------------------------------------------------------------------------+");
-    else
-        BIOS_Int10RightJustifiedPrint(x,y,"ษออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออป");
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("", ""));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("System date:", "0000-00-00"));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("System time:", "00:00:00"));
+    BIOS_Int10RightJustifiedPrint(x,y,"ษออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออป", true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("", ""), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("System date:", "0000-00-00"), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("System time:", "00:00:00"), true);
     updateDateTime(x,y,0);
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Installed OS:", "DOS"));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("", ""));
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Installed OS:", "DOS"), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("", ""), true);
 #define DOSNAMEBUF 256
     char pcname[DOSNAMEBUF];
     if (control->opt_securemode || control->SecureMode())
@@ -7117,32 +7226,29 @@ void showBIOSSetup(const char* card, int x, int y) {
 #endif
             strcpy(pcname, "N/A");
     }
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Computer name:", pcname));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Product name:", ("DOSBox-X "+std::string(VERSION)).c_str()));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Product updated:", UPDATED_STR));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("", ""));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("BIOS description:", bios_type_string));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("BIOS version:", bios_version_string));
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Computer name:", pcname), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Product name:", ("DOSBox-X "+std::string(VERSION)).c_str()), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Product updated:", UPDATED_STR), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("", ""), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("BIOS description:", bios_type_string), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("BIOS version:", bios_version_string), true);
     uint32_t year,month,day;
     if (sscanf(bios_date_string,"%u/%u/%u",&month,&day,&year)==3) {
         char datestr[30];
         sprintf(datestr, "%04u-%02u-%02u",year<80?2000+year:(year<100?1900+year:year),month,day);
-        BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("BIOS date:", datestr));
+        BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("BIOS date:", datestr), true);
     } else
-        BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("BIOS date:", bios_date_string));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("", ""));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Processor type:", GetCPUType()));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Processor speed:", (std::to_string(CPU_CycleAutoAdjust?CPU_CyclePercUsed:CPU_CycleMax)+(CPU_CycleAutoAdjust?"%":" cycles/ms")).c_str()));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Coprocessor:", enable_fpu?"Yes":"No"));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("", ""));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Video card:", card));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Video memory:", (std::to_string(vga.mem.memsize/1024)+"K").c_str()));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Total memory:", (std::to_string(MEM_TotalPages()*4096/1024)+"K").c_str()));
-    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("", ""));
-    if (machine == MCH_PC98)
-        BIOS_Int10RightJustifiedPrint(x,y,"+------------------------------------------------------------------------------+");
-    else
-        BIOS_Int10RightJustifiedPrint(x,y,"ศออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออผ");
+        BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("BIOS date:", bios_date_string), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("", ""), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Processor type:", GetCPUType()), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Processor speed:", (std::to_string(CPU_CycleAutoAdjust?CPU_CyclePercUsed:CPU_CycleMax)+(CPU_CycleAutoAdjust?"%":" cycles/ms")).c_str()), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Coprocessor:", enable_fpu?"Yes":"No"), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("", ""), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Video card:", card), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Video memory:", (std::to_string(vga.mem.memsize/1024)+"K").c_str()), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("Total memory:", (std::to_string(MEM_TotalPages()*4096/1024)+"K").c_str()), true);
+    BIOS_Int10RightJustifiedPrint(x,y,getSetupLine("", ""), true);
+    BIOS_Int10RightJustifiedPrint(x,y,"ศออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออออผ", true);
     if (machine == MCH_PC98)
         BIOS_Int10RightJustifiedPrint(x,y,"                                  ESC = Exit                                  ");
     else
@@ -7151,6 +7257,7 @@ void showBIOSSetup(const char* card, int x, int y) {
 
 static Bitu ulimit = 0;
 static Bitu t_conv = 0;
+static Bitu t_conv_real = 0;
 static bool bios_first_init=true;
 static bool bios_has_exec_vga_bios=false;
 static Bitu adapter_scan_start;
@@ -7296,6 +7403,8 @@ static Bitu Default_IRQ_Handler_Cooperative_Slave_Pic(void) {
 
     return CBRET_NONE;
 }
+
+extern uint32_t tandy_128kbase;
 
 static int bios_post_counter = 0;
 
@@ -7950,6 +8059,9 @@ private:
         // FIXME: We're using IBM PC memory size storage even in PC-98 mode.
         //        This cannot be removed, because the DOS kernel uses this variable even in PC-98 mode.
         mem_writew(BIOS_MEMORY_SIZE,t_conv);
+        // According to Ripsaw, Tandy systems hold the real memory size in a normally reserved field [https://www.vogons.org/viewtopic.php?p=948898#p948898]
+        // According to the PCjr hardware reference library that memory location means the same thing
+        if (machine == MCH_PCJR || machine == MCH_TANDY) mem_writew(BIOS_MEMORY_SIZE+2,t_conv_real);
 
         RealSetVec(0x08,BIOS_DEFAULT_IRQ0_LOCATION);
         // pseudocode for CB_IRQ0:
@@ -8508,8 +8620,9 @@ private:
     }
     CALLBACK_HandlerObject cb_bios_startup_screen;
     static Bitu cb_bios_startup_screen__func(void) {
-startfunction:
-        if (control->opt_fastlaunch && machine != MCH_PC98) {
+        const Section_prop* section = static_cast<Section_prop *>(control->GetSection("dosbox"));
+        bool fastbioslogo=section->Get_bool("fastbioslogo")||control->opt_fastbioslogo||control->opt_fastlaunch;
+        if (fastbioslogo && machine != MCH_PC98) {
 #if defined(USE_TTF)
             if (TTF_using()) {
                 uint32_t lasttick=GetTicks();
@@ -8521,32 +8634,53 @@ startfunction:
                 CALLBACK_RunRealInt(0x10);
             }
 #endif
-            return CBRET_NONE;
+            if (control->opt_fastlaunch) return CBRET_NONE;
         }
         extern const char* RunningProgram;
         extern void GFX_SetTitle(int32_t cycles, int frameskip, Bits timing, bool paused);
         RunningProgram = "DOSBOX-X";
         GFX_SetTitle(-1,-1,-1,false);
-        const char *msg = "DOSBox-X (C) 2011-" COPYRIGHT_END_YEAR " The DOSBox-X Team\nDOSBox-X project maintainer: joncampbell123\nDOSBox-X project homepage: https://dosbox-x.com\n\n";
-        int logo_x,logo_y,x,y,rowheight=8;
-
-        y = 2;
-        x = 2;
+        const char *msg = "DOSBox-X (C) 2011-" COPYRIGHT_END_YEAR " The DOSBox-X Team\nDOSBox-X project maintainer: joncampbell123\nDOSBox-X project homepage: https://dosbox-x.com\nDOSBox-X user guide: https://dosbox-x.com/wiki\n\n";
+        bool textsplash = section->Get_bool("disable graphical splash");
+#if defined(USE_TTF)
+        if (TTF_using()) {
+            textsplash = true;
+            if (ttf.cols != 80 || ttf.lins != 25) {
+                oldcols = ttf.cols;
+                oldlins = ttf.lins;
+            } else
+                oldcols = oldlins = 0;
+        }
+#endif
+        char logostr[8][30];
+        strcpy(logostr[0], "+-------------------+");
+        strcpy(logostr[1], "|    Welcome  To    |");
+        strcpy(logostr[2], "|                   |");
+        strcpy(logostr[3], "| D O S B o x - X ! |");
+        strcpy(logostr[4], "|                   |");
+        sprintf(logostr[5], "|    %d-bit %s    |",
+#if defined(_M_X64) || defined (_M_AMD64) || defined (_M_ARM64) || defined (_M_IA64) || defined(__ia64__) || defined(__LP64__) || defined(_WIN64) || defined(__x86_64__) || defined(__aarch64__) || defined(__powerpc64__)^M
+        64
+#else^M
+        32
+#endif^M
+        , SDL_STRING);
+        sprintf(logostr[6], "|  Version %7s  |", VERSION);
+        strcpy(logostr[7], "+-------------------+");
+startfunction:
+        int logo_x,logo_y,x=2,y=2,rowheight=8;
         logo_y = 2;
         logo_x = 80 - 2 - (224/8);
 
         if (cpu.pmode) E_Exit("BIOS error: STARTUP function called while in protected/vm86 mode");
 
-        // TODO: For those who would rather not use the VGA graphical modes, add a configuration option to "disable graphical splash".
-        //       We would then revert to a plain text copyright and status message here (and maybe an ASCII art version of the DOSBox-X logo).
-        //       This option is especially useful for TrueType font (TTF) output which supports text-mode only
-        if (IS_VGA_ARCH) {
+        if (IS_VGA_ARCH && !textsplash) {
             rowheight = 16;
             reg_eax = 18;       // 640x480 16-color
             CALLBACK_RunRealInt(0x10);
             DrawDOSBoxLogoVGA((unsigned int)logo_x*8u,(unsigned int)logo_y*(unsigned int)rowheight);
         }
-        else if (machine == MCH_EGA) {
+        else if (machine == MCH_EGA && !textsplash) {
             rowheight = 14;
             reg_eax = 16;       // 640x350 16-color
             CALLBACK_RunRealInt(0x10);
@@ -8560,7 +8694,7 @@ startfunction:
 
             DrawDOSBoxLogoVGA((unsigned int)logo_x*8u,(unsigned int)logo_y*(unsigned int)rowheight);
         }
-        else if (machine == MCH_CGA || machine == MCH_MCGA || machine == MCH_PCJR || machine == MCH_AMSTRAD || machine == MCH_TANDY) {
+        else if ((machine == MCH_CGA || machine == MCH_MCGA || machine == MCH_PCJR || machine == MCH_AMSTRAD || machine == MCH_TANDY) && !textsplash) {
             rowheight = 8;
             reg_eax = 6;        // 640x200 2-color
             CALLBACK_RunRealInt(0x10);
@@ -8618,10 +8752,20 @@ startfunction:
                 }
             }
 
-            if (!control->opt_fastlaunch) DrawDOSBoxLogoPC98((unsigned int)logo_x*8u,(unsigned int)logo_y*(unsigned int)rowheight);
-
-            reg_eax = 0x4000;   // show the graphics layer (PC-98) so we can render the DOSBox logo
-            CALLBACK_RunRealInt(0x18);
+            if (textsplash) {
+                unsigned int bo, lastline = 7;
+                for (unsigned int i=0; i<=lastline; i++) {
+                    for (unsigned int j=0; j<strlen(logostr[i]); j++) {
+                        bo = (((unsigned int)(i+2) * 80u) + (unsigned int)(j+0x36)) * 2u;
+                        mem_writew(0xA0000+bo,i==0&&j==0?0x330B:(i==0&&j==strlen(logostr[0])-1?0x370B:(i==lastline&&j==0?0x3B0B:(i==lastline&&j==strlen(logostr[lastline])-1?0x3F0B:(logostr[i][j]=='-'&&(i==0||i==lastline)?0x250B:(logostr[i][j]=='|'?0x270B:logostr[i][j]%0xff))))));
+                        mem_writeb(0xA2000+bo+1,0xE1);
+                    }
+                }
+            } else {
+                if (!control->opt_fastlaunch) DrawDOSBoxLogoPC98((unsigned int)logo_x*8u,(unsigned int)logo_y*(unsigned int)rowheight);
+                reg_eax = 0x4000;   // show the graphics layer (PC-98) so we can render the DOSBox-X logo
+                CALLBACK_RunRealInt(0x18);
+            }
         }
         else {
             reg_eax = 3;        // 80x25 text
@@ -8630,6 +8774,10 @@ startfunction:
             // TODO: For CGA, PCjr, and Tandy, we could render a 4-color CGA version of the same logo.
             //       And for MDA/Hercules, we could render a monochromatic ASCII art version.
         }
+
+#if defined(USE_TTF)
+        if (TTF_using() && (ttf.cols != 80 || ttf.lins != 25)) ttf_setlines(80, 25);
+#endif
 
         if (machine != MCH_PC98) {
             reg_eax = 0x0200;   // set cursor pos
@@ -8640,6 +8788,27 @@ startfunction:
         }
 
         BIOS_Int10RightJustifiedPrint(x,y,msg);
+        if (machine != MCH_PC98 && textsplash) {
+            Bitu edx = reg_edx;
+            int oldx = x, oldy = y;
+            unsigned int lastline = 7;
+            for (unsigned int i=0; i<=lastline; i++) {
+                for (unsigned int j=0; j<strlen(logostr[i]); j++) {
+                    reg_eax = 0x0200u;
+                    reg_ebx = 0x0000u;
+                    reg_edx = 0x0236u + i*0x100 + j;
+                    CALLBACK_RunRealInt(0x10);
+                    reg_eax = 0x0900u+(i==0&&j==0?0xDA:(i==0&&j==strlen(logostr[0])-1?0xBF:(i==lastline&&j==0?0xC0:(i==lastline&&j==strlen(logostr[lastline])-1?0xD9:(logostr[i][j]=='-'&&(i==0||i==lastline)?0xC4:(logostr[i][j]=='|'?0xB3:logostr[i][j]%0xff))))));
+                    reg_ebx = i!=0&&i!=lastline&&logostr[i][j]!='|'?0x002eu:0x002fu;
+                    reg_ecx = 0x0001u;
+                    CALLBACK_RunRealInt(0x10);
+                }
+            }
+            reg_eax = 0x0200u;
+            reg_ebx = 0x0000u;
+            reg_edx = edx;
+            CALLBACK_RunRealInt(0x10);
+        }
 
         {
             uint64_t sz = (uint64_t)MEM_TotalPages() * (uint64_t)4096;
@@ -8690,6 +8859,16 @@ startfunction:
                         break;
                     case SVGA_S3Trio:
                         card = "S3 Trio SVGA";
+                        switch (s3Card) {
+                            case S3_86C928:     card = "S3 86C928"; break;
+                            case S3_Vision864:  card = "S3 Vision864 SVGA"; break;
+                            case S3_Vision868:  card = "S3 Vision868 SVGA"; break;
+                            case S3_Trio32:     card = "S3 Trio32 SVGA"; break;
+                            case S3_Trio64:     card = "S3 Trio64 SVGA"; break;
+                            case S3_Trio64V:    card = "S3 Trio64V+ SVGA"; break;
+                            case S3_ViRGE:      card = "S3 ViRGE SVGA"; break;
+                            case S3_ViRGEVX:    card = "S3 ViRGE VX SVGA"; break;
+                        }
                         break;
                     default:
                         card = "Standard VGA";
@@ -8767,8 +8946,8 @@ startfunction:
         }
 
 #if !defined(C_EMSCRIPTEN)
-        BIOS_Int10RightJustifiedPrint(x,y,"\nHit SPACEBAR to pause at this screen\n");
-        BIOS_Int10RightJustifiedPrint(x,y,"\nPress DEL to enter BIOS setup screen\n");
+        BIOS_Int10RightJustifiedPrint(x,y,"\nHit SPACEBAR to pause at this screen\n", false, true);
+        BIOS_Int10RightJustifiedPrint(x,y,"\nPress DEL to enter BIOS setup screen\n", false, true);
         y--; /* next message should overprint */
         if (machine != MCH_PC98) {
             reg_eax = 0x0200;   // set cursor pos
@@ -8798,7 +8977,6 @@ startfunction:
             emscripten_sleep(100);
         }
 #else
-        bool fastbioslogo=static_cast<Section_prop *>(control->GetSection("dosbox"))->Get_bool("fastbioslogo")||control->opt_fastbioslogo||control->opt_fastlaunch;
         if (!fastbioslogo&&!bootguest&&!bootfast&&(bootvm||!use_quick_reboot)) {
             bool wait_for_user = false, bios_setup = false;
             int pos=1;
@@ -8825,8 +9003,8 @@ startfunction:
                     }
 
                     if (reg_al == 32) { // user hit space
-                        BIOS_Int10RightJustifiedPrint(x,y,"Hit ENTER or ESC to continue                    \n"); // overprint
-                        BIOS_Int10RightJustifiedPrint(x,y,"\nPress DEL to enter BIOS setup screen\n");
+                        BIOS_Int10RightJustifiedPrint(x,y,"Hit ENTER or ESC to continue                    \n", false, true); // overprint
+                        BIOS_Int10RightJustifiedPrint(x,y,"\nPress DEL to enter BIOS setup screen\n", false, true);
                         wait_for_user = true;
                         break;
                     }
@@ -8887,10 +9065,22 @@ startfunction:
                     }
                     if (askexit) {
                         if (reg_al == 'Y' || reg_al == 'y') {
-#if defined(USE_TTF)
-                            if (TTF_using() && oldcols>0 && oldlins>0) ttf_setlines(oldcols, oldlins);
-#endif
+                            if (machine == MCH_PC98) {
+                                reg_eax = 0x1600;
+                                reg_edx = 0xE100;
+                                CALLBACK_RunRealInt(0x18);
+                            }
                             goto startfunction;
+                        } else if (machine == MCH_PC98) {
+                            const char *exitstr = "ESC = Exit";
+                            unsigned int bo;
+                            for (unsigned int i=0; i<strlen(exitstr); i++) {
+                                bo = (((unsigned int)24 * 80u) + (unsigned int)0x22+i) * 2u;
+                                mem_writew(0xA0000+bo,(unsigned char)exitstr[i]);
+                                mem_writeb(0xA2000+bo,0xE1);
+                            }
+                            askexit = false;
+                            continue;
                         } else {
                             reg_eax = 0x0200u;
                             reg_ebx = 0x0000u;
@@ -8955,34 +9145,27 @@ startfunction:
                         lasttick-=500;
                     } else if (reg_al == 27/*ESC*/) {
                         if (machine == MCH_PC98) {
-                            reg_eax = 0x1600;
-                            reg_edx = 0xE100;
-                            CALLBACK_RunRealInt(0x18);
-#if defined(USE_TTF)
-                            if (TTF_using() && oldcols>0 && oldlins>0) ttf_setlines(oldcols, oldlins);
-#endif
-                            goto startfunction;
+                            const char *exitstr = "Exit[Y/N]?";
+                            unsigned int bo;
+                            for (unsigned int i=0; i<strlen(exitstr); i++) {
+                                bo = (((unsigned int)24 * 80u) + (unsigned int)0x22+i) * 2u;
+                                mem_writew(0xA0000+bo,(unsigned char)exitstr[i]);
+                                mem_writeb(0xA2000+bo,0xE1);
+                            }
+                        } else {
+                            reg_eax = 0x0200u;
+                            reg_ebx = 0x0000u;
+                            reg_edx = 0x1800u;
+                            CALLBACK_RunRealInt(0x10);
+                            if (mod)
+                                BIOS_Int10RightJustifiedPrint(x,y,"              Save settings and exit the BIOS Setup Utility [Y/N]? ");
+                            else
+                                BIOS_Int10RightJustifiedPrint(x,y,"              Exit the BIOS Setup Utility and reboot system [Y/N]? ");
                         }
-                        reg_eax = 0x0200u;
-                        reg_ebx = 0x0000u;
-                        reg_edx = 0x1800u;
-                        CALLBACK_RunRealInt(0x10);
-                        if (mod)
-                            BIOS_Int10RightJustifiedPrint(x,y,"              Save settings and exit the BIOS Setup Utility [Y/N]? ");
-                        else
-                            BIOS_Int10RightJustifiedPrint(x,y,"              Exit the BIOS Setup Utility and reboot system [Y/N]? ");
                         askexit = true;
                     }
                 }
             }
-#if defined(USE_TTF)
-        } else if (TTF_using() && machine != MCH_PC98) {
-            uint32_t lasttick=GetTicks();
-            while ((GetTicks()-lasttick)<500) {
-                reg_eax = 0x0100;
-                CALLBACK_RunRealInt(0x16);
-            }
-#endif
         }
 #endif
 
@@ -9003,12 +9186,23 @@ startfunction:
             reg_eax = 0x4200;   // setup 640x200 graphics
             reg_ecx = 0x8000;   // lower
             CALLBACK_RunRealInt(0x18);
+            if (textsplash) {
+                reg_eax = 0x1600;
+                reg_edx = 0xE100;
+                CALLBACK_RunRealInt(0x18);
+            }
         }
         else {
             // restore 80x25 text mode
             reg_eax = 3;
             CALLBACK_RunRealInt(0x10);
         }
+#if defined(USE_TTF)
+        if (TTF_using() && oldcols>0 && oldlins>0) {
+            ttf_setlines(oldcols, oldlins);
+            oldcols = oldlins = 0;
+        }
+#endif
 
         return CBRET_NONE;
     }
@@ -9060,7 +9254,7 @@ startfunction:
 
         for (Bitu i=0;i < 0x400;i++) mem_writeb(0x7C00+i,0);
 		if ((bootguest||(!bootvm&&use_quick_reboot))&&!bootfast&&bootdrive>=0&&imageDiskList[bootdrive]) {
-			if (bootguest) MOUSE_Startup(NULL);
+			MOUSE_Startup(NULL);
 			char drive[] = "-QQ A:";
 			drive[4]='A'+bootdrive;
 			runBoot(drive);
@@ -9198,12 +9392,6 @@ public:
             if (t_conv > 640) t_conv = 640;
         }
 
-        if (IS_TANDY_ARCH) {
-            /* reduce reported memory size for the Tandy (32k graphics memory
-               at the end of the conventional 640k) */
-            if (machine==MCH_TANDY && t_conv > 624) t_conv = 624;
-        }
-
         /* allow user to further limit the available memory below 1MB */
         if (dos_conventional_limit != 0 && t_conv > dos_conventional_limit)
             t_conv = dos_conventional_limit;
@@ -9214,12 +9402,90 @@ public:
 
         /* if requested to emulate an ISA memory hole at 512KB, further limit the memory */
         if (isa_memory_hole_512kb && t_conv > 512) t_conv = 512;
+        t_conv_real = t_conv;
+
+        if (machine == MCH_TANDY) {
+            /* Tandy models are said to have started with 256KB. We'll allow down to 64KB */
+            if (t_conv < 64)
+                t_conv = 64;
+            if (t_conv < 256)
+                LOG(LOG_MISC,LOG_WARN)("Warning: Tandy with less than 256KB is unusual");
+
+            /* The shared video/system memory design, and the placement of video RAM at top
+             * of conventional memory, means that if conventional memory is less than 640KB
+             * and not a multiple of 32KB, things can break. */
+            if ((t_conv % 32) != 0)
+                LOG(LOG_MISC,LOG_WARN)("Warning: Conventional memory size %uKB in Tandy mode is not a multiple of 32KB, games may not display graphics correctly",t_conv);
+        }
+        else if (machine == MCH_PCJR) {
+            if (t_conv < 64)
+                t_conv = 64;
+
+            /* PCjr also shares video/system memory, but the video memory can only exist
+             * below 128KB because IBM intended it to only carry 64KB or 128KB on the
+             * motherboard. Any memory past 128KB is likely provided by addons (sidecars) */
+            if (t_conv < 128 && (t_conv % 32) != 0)
+                LOG(LOG_MISC,LOG_WARN)("Warning: Conventional memory size %uKB in PCjr mode is not a multiple of 32KB, games may not display graphics correctly",t_conv);
+        }
 
         /* and then unmap RAM between t_conv and ulimit */
         if (t_conv < ulimit) {
             Bitu start = (t_conv+3)/4;  /* start = 1KB to page round up */
             Bitu end = ulimit/4;        /* end = 1KB to page round down */
             if (start < end) MEM_ResetPageHandler_Unmapped(start,end-start);
+        }
+
+        if (machine == MCH_TANDY) {
+            /* Take 16KB off the top for video RAM.
+             * This value never changes after boot, even if you then use the 16-color modes which then moves
+             * the video RAM region down 16KB to make a 32KB region. Neither MS-DOS nor INT 10h change this
+             * top of memory value. I hope your DOS game doesn't put any important structures or MCBs above
+             * the 32KB below top of memory, because it WILL get overwritten with graphics!
+             *
+             * This is apparently correct behavior, and DOSBox SVN and other forks follow it too.
+             *
+             * See also: [https://www.vogons.org/viewtopic.php?p=948879#p948879]
+             * Issue: [https://github.com/joncampbell123/dosbox-x/issues/2380]
+             *
+             * Mickeys Space Adventure assumes it can find video RAM by calling INT 12h, subtracting 16KB, and
+             * converting KB to paragraphs. Note that it calls INT 12h while in CGA mode, and subtracts 16KB
+             * knowing video memory will extend downward 16KB into a 32KB region when it switches into the
+             * Tandy/PCjr 16-color mode. */
+            if (t_conv > 640) t_conv = 640;
+            if (ulimit > 640) ulimit = 640;
+            t_conv -= 16;
+            ulimit -= 16;
+
+            /* if 32KB would cross a 128KB boundary, then adjust again or else
+             * things will horribly break between text and graphics modes */
+            if ((t_conv % 128) < 16)
+                t_conv -= 16;
+
+            /* Our choice also affects which 128KB bank within which the 16KB banks
+             * select what system memory becomes video memory.
+             *
+             * FIXME: Is this controlled by the "extended ram page register?" How? */
+            tandy_128kbase = ((t_conv - 16u) << 10u) & 0xE0000; /* byte offset = (KB - 16) * 64, round down to multiple of 128KB */
+            LOG(LOG_MISC,LOG_DEBUG)("BIOS: setting tandy 128KB base region to %lxh",(unsigned long)tandy_128kbase);
+        }
+        else if (machine == MCH_PCJR) {
+            /* PCjr reserves the top of it's internal 128KB of RAM for video RAM.
+             * Sidecars can extend it past 128KB but it requires DOS drivers or TSRs
+             * to modify the MCB chain so that it a) marks the video memory as reserved
+             * and b) creates a new free region above the video RAM region.
+             *
+             * Therefore, only subtract 16KB if 128KB or less is configured for this machine.
+             *
+             * Note this is not speculation, it's there in the PCjr BIOS source code:
+             * [http://hackipedia.org/browse.cgi/Computer/Platform/PC%2c%20IBM%20compatible/Video/PCjr/IBM%20Personal%20Computer%20PCjr%20Hardware%20Reference%20Library%20Technical%20Reference%20%281983%2d11%29%20First%20Edition%20Revised%2epdf] ROM BIOS source code page A-16 */
+            if (t_conv <= (128+16)) {
+                if (t_conv > 128) t_conv = 128;
+                t_conv -= 16;
+            }
+            if (ulimit <= (128+16)) {
+                if (ulimit > 128) ulimit = 128;
+                ulimit -= 16;
+            }
         }
 
         /* INT 4B. Now we can safely signal error instead of printing "Invalid interrupt 4B"

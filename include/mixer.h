@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,8 +19,6 @@
 
 #ifndef DOSBOX_MIXER_H
 #define DOSBOX_MIXER_H
-
-#include <sstream>
 
 #ifndef DOSBOX_DOSBOX_H
 #include "dosbox.h"

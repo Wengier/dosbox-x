@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -75,7 +75,7 @@ static float int_to_float(const uint32_t i)
 // Print debug messages
 #define LOG_GLIDE 0
 
-void VFILE_Remove(const char *name);
+void VFILE_Remove(const char *name,const char *dir = "");
 static void process_msg(Bitu);
 
 /** Global Variables **/
@@ -450,7 +450,7 @@ public:
 	    hdll = NULL;
 	}
 
-	if (addovl) VFILE_Remove("GLIDE2X.OVL");
+	if (addovl) VFILE_Remove("GLIDE2X.OVL","SYSTEM");
     }
 };
 

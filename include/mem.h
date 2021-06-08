@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -81,14 +81,16 @@ static INLINE uint16_t host_readw(ConstHostPt off) {
 static INLINE uint32_t host_readd(ConstHostPt off) {
     return __builtin_bswap32(*(uint32_t *)off);
 }
-static INLINE void host_writew(HostPt off, const uint16_t val) {
+static INLINE void host_writew(HostPt const off, const uint16_t val) {
     *(uint16_t *)off = __builtin_bswap16(val);
 }
-static INLINE void host_writed(HostPt off, const uint32_t val) {
+static INLINE void host_writed(HostPt const off, const uint32_t val) {
     *(uint32_t *)off = __builtin_bswap32(val);
 }
-
-#elif defined(WORDS_BIGENDIAN) || !defined(C_UNALIGNED_MEMORY)
+static INLINE void host_writeq(HostPt const off, const uint64_t val) {
+    *(uint64_t *)off = __builtin_bswap64(val);
+}
+#elif !defined(C_UNALIGNED_MEMORY)
 /* !defined(C_UNALIGNED_MEMORY) meaning: we're probably being compiled for a processor that doesn't like unaligned WORD access,
         on such processors typecasting memory as uint16_t and higher can cause a fault if the
         address is not aligned to that datatype when we read/write through it. */
@@ -143,7 +145,7 @@ static INLINE void host_writeq(HostPt const off,const uint64_t val) {
 
 
 static INLINE void var_write(uint8_t * const var, const uint8_t val) {
-    host_writeb((HostPt)var, val);
+    host_writeb(var, val);
 }
 
 static INLINE void var_write(uint16_t * const var, const uint16_t val) {
@@ -203,7 +205,7 @@ static INLINE uint32_t phys_readd(const PhysPt addr) {
 
 /* These don't check for alignment, better be sure it's correct */
 
-void MEM_BlockWrite(PhysPt pt,void const * const data,Bitu size);
+void MEM_BlockWrite(PhysPt pt, const void *data, size_t size);
 void MEM_BlockRead(PhysPt pt,void * data,Bitu size);
 void MEM_BlockWrite32(PhysPt pt,void * data,Bitu size);
 void MEM_BlockRead32(PhysPt pt,void * data,Bitu size);
@@ -217,32 +219,32 @@ void mem_strcpy(PhysPt dest,PhysPt src);
 /* The folowing functions are all shortcuts to the above functions using physical addressing */
 
 static inline constexpr PhysPt PhysMake(const uint16_t seg,const uint16_t off) {
-    return ((PhysPt)seg << (PhysPt)4U) + (PhysPt)off;
+    return ((PhysPt)seg << 4U) + (PhysPt)off;
 }
 
 static inline constexpr uint16_t RealSeg(const RealPt pt) {
-    return (uint16_t)((RealPt)pt >> (RealPt)16U);
+    return (uint16_t)(pt >> 16U);
 }
 
 static inline constexpr uint16_t RealOff(const RealPt pt) {
-    return (uint16_t)((RealPt)pt & (RealPt)0xffffu);
+    return (uint16_t)(pt & 0xffffu);
 }
 
 static inline constexpr PhysPt Real2Phys(const RealPt pt) {
-    return (PhysPt)(((PhysPt)RealSeg(pt) << (PhysPt)4U) + (PhysPt)RealOff(pt));
+    return (((PhysPt)RealSeg(pt) << 4U) + (PhysPt)RealOff(pt));
 }
 
 static inline constexpr RealPt RealMake(const uint16_t seg,const uint16_t off) {
-    return (RealPt)(((RealPt)seg << (RealPt)16U) + (RealPt)off);
+    return (((RealPt)seg << 16U) + (RealPt)off);
 }
 
 /* convert physical address to 4:16 real pointer (example: 0xABCDE -> 0xA000:0xBCDE) */
 static inline constexpr RealPt PhysToReal416(const PhysPt phys) {
-    return RealMake((uint16_t)(((PhysPt)phys >> (PhysPt)4U) & (PhysPt)0xF000U),(uint16_t)((PhysPt)phys & (PhysPt)0xFFFFU));
+    return RealMake((uint16_t)((phys >> 4U) & 0xF000U),(uint16_t)(phys & 0xFFFFU));
 }
 
 static inline constexpr PhysPt RealVecAddress(const uint8_t vec) {
-    return (PhysPt)((unsigned int)vec << 2U);
+    return ((unsigned int)vec << 2U);
 }
 
 
@@ -272,7 +274,7 @@ static INLINE RealPt RealGetVec(const uint8_t vec) {
 }
 
 static INLINE void RealSetVec(const uint8_t vec,const RealPt pt) {
-    mem_writed(RealVecAddress(vec),(uint32_t)pt);
+    mem_writed(RealVecAddress(vec),pt);
 }
 
 static INLINE void RealSetVec(const uint8_t vec,const RealPt pt,RealPt &old) {

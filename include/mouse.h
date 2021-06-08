@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -35,8 +35,8 @@ void Mouse_ChangePS2Callback(uint16_t pseg, uint16_t pofs);
 
 
 void Mouse_CursorMoved(float xrel,float yrel,float x,float y,bool emulate);
-#if defined(WIN32) || defined(C_SDL2)
 const char* Mouse_GetSelected(int x1, int y1, int x2, int y2, int w, int h, uint16_t *textlen);
+#if defined(WIN32) || defined(MACOSX) || defined(C_SDL2)
 void Mouse_Select(int x1, int y1, int x2, int y2, int w, int h, bool select);
 #endif
 void Mouse_ButtonPressed(uint8_t button);

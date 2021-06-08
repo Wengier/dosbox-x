@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -358,7 +358,7 @@ restart_core:
 				block = CreateCacheBlock(chandler,ip_point,cache_size);
 			}
 		} else {
-			int32_t old_cycles=CPU_Cycles;
+			int32_t old_cycles=(int32_t)CPU_Cycles;
 			CPU_Cycles=1;
 			CPU_CycleLeft+=old_cycles;
 			// manually save
@@ -470,7 +470,7 @@ run_block:
 }
 
 Bits CPU_Core_Dyn_X86_Trap_Run(void) {
-	int32_t oldCycles = CPU_Cycles;
+	int32_t oldCycles = (int32_t)CPU_Cycles;
 	CPU_Cycles = 1;
 	cpu.trap_skip = false;
 

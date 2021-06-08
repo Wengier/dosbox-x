@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <assert.h>
-
+#include <limits.h>
 
 #include "SDL.h"
 
@@ -296,6 +296,10 @@ void                                            GFX_ForceRedrawScreen(void);    
 void                                            DOSBox_SetSysMenu(void);
 void                                            WindowsTaskbarUpdatePreviewRegion(void);// external
 void                                            WindowsTaskbarResetPreviewRegion(void); // external
+#endif
+
+#if defined(MACOSX)
+void                        macosx_reload_touchbar(void);
 #endif
 
 //! \brief Base CEvent class for mapper events
@@ -737,7 +741,9 @@ class Typer {
 					for (auto &event : *m_events) {
 						if (bind_name == event->GetName()) {
 							found = true;
-							MAPPER_TriggerEvent(event, true);
+							event->Active(true);
+						        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+							event->Active(false);
 							break;
 						}
 					}
@@ -912,9 +918,9 @@ static SDLKey sdlkey_map[MAX_SCANCODES]={SDLK_UNKNOWN,SDLK_ESCAPE,
 void setScanCode(Section_prop * section) {
 	usescancodes = -1;
 	const char *usesc = section->Get_string("usescancodes");
-	if (!strcasecmp(usesc, "true"))
+	if (!strcasecmp(usesc, "true")||!strcmp(usesc, "1"))
 		usescancodes = 1;
-	else if (!strcasecmp(usesc, "false"))
+	else if (!strcasecmp(usesc, "false")||!strcmp(usesc, "0"))
 		usescancodes = 0;
 }
 void loadScanCode();
@@ -1626,6 +1632,7 @@ private:
         return NULL;
     }
     CBind * CreateHatBind(Bitu hat,uint8_t value) {
+        if (hat < hats_cap) return NULL;
         Bitu hat_dir;
         if (value&SDL_HAT_UP) hat_dir=0;
         else if (value&SDL_HAT_RIGHT) hat_dir=1;
@@ -1812,8 +1819,8 @@ public:
 
         axes_cap=emulated_axes;
         if (axes_cap>axes) axes_cap=axes;
-        hats_cap=emulated_hats;
-        if (hats_cap>hats) hats_cap=hats;
+        //hats_cap=emulated_hats;
+        //if (hats_cap>hats) hats_cap=hats;
 
         JOYSTICK_Enable(1,true);
         JOYSTICK_Move_Y(1,1.0);
@@ -4133,7 +4140,14 @@ static void MAPPER_SaveBinds(void) {
             fprintf(savefile,"%s \n",line.c_str());
     }
     fclose(savefile);
-    change_action_text("Mapper file saved.",CLR_WHITE);
+#if defined(WIN32)
+    char path[MAX_PATH];
+    if (GetFullPathName(mapper.filename.c_str(), MAX_PATH, path, NULL)) LOG_MSG("Saved mapper file: %s", path);
+#elif defined(HAVE_REALPATH)
+    char path[PATH_MAX];
+    if (realpath(mapper.filename.c_str(), path) != NULL) LOG_MSG("Saved mapper file: %s", path);
+#endif
+    change_action_text(("Mapper file saved: "+mapper.filename).c_str(),CLR_WHITE);
 }
 
 static bool MAPPER_LoadBinds(void) {
@@ -4635,8 +4649,7 @@ void MAPPER_RunInternal() {
 #endif
 
 #if defined(MACOSX)
-    void osx_reload_touchbar(void);
-    osx_reload_touchbar();
+    macosx_reload_touchbar();
 #endif
 
     /* Go in the event loop */
@@ -4667,6 +4680,12 @@ void MAPPER_RunInternal() {
     SDL_FreeSurface(mapper.draw_surface_nonpaletted);
     SDL_FreePalette(sdl2_map_pal_ptr);
     GFX_SetResizeable(true);
+#elif C_DIRECT3D
+    bool Direct3D_using(void);
+    if (Direct3D_using() && !IS_VGA_ARCH && !IS_PC98_ARCH) {
+        change_output(0);
+        change_output(6);
+    }
 #endif
 #if defined(USE_TTF)
     void resetFontSize();
@@ -4727,8 +4746,7 @@ void MAPPER_RunInternal() {
     mapper.running = false;
 
 #if defined(MACOSX)
-    void osx_reload_touchbar(void);
-    osx_reload_touchbar();
+    macosx_reload_touchbar();
 #endif
 
 #ifdef DOSBOXMENU_EXTERNALLY_MANAGED
@@ -4747,7 +4765,7 @@ void MAPPER_CheckKeyboardLayout() {
 #if defined(WIN32)
     WORD cur_kb_layout = LOWORD(GetKeyboardLayout(0));
 
-    isJPkeyboard = false;
+    isJPkeyboard = true;
 
     if (cur_kb_layout == 1041/*JP106*/) {
         isJPkeyboard = true;
@@ -5060,15 +5078,6 @@ void MAPPER_StartUp() {
 #if !defined(C_SDL2)
 	load=true;
 #endif
-
-    {
-        DOSBoxMenu::item *itemp = NULL;
-
-        MAPPER_AddHandler(&MAPPER_Run,MK_m,MMODHOST,"mapper","Mapper editor",&itemp);
-        itemp->set_accelerator(DOSBoxMenu::accelerator('m'));
-        itemp->set_description("Bring up the mapper UI");
-        itemp->set_text("Mapper editor");
-    }
 }
 
 void MAPPER_Shutdown() {

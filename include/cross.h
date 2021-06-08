@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -24,10 +24,7 @@
 #include "dosbox.h"
 #endif
 
-#include <stdio.h>
 #include <sys/stat.h>
-#include <sys/types.h>
-#include <string>
 
 #if defined (_MSC_VER)						/* MS Visual C++ */
 #include <direct.h>

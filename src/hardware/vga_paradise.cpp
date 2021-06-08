@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -231,13 +231,6 @@ void SVGA_Setup_ParadisePVGA1A(void) {
 	} else {
 		pvga1a.PR1 = 2<<6;
 	}
-
-	// Paradise ROM signature
-	PhysPt rom_base=PhysMake(0xc000,0);
-	phys_writeb(rom_base+0x007d,'V');
-	phys_writeb(rom_base+0x007e,'G');
-	phys_writeb(rom_base+0x007f,'A');
-	phys_writeb(rom_base+0x0080,'=');
 
 	IO_Write(0x3cf, 0x05); // Enable!
 }

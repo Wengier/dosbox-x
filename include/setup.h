@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -42,12 +42,6 @@
 #define CH_STRING
 #include <string>
 #endif
-
-#ifndef CH_CSTDIO
-#define CH_CSTDIO
-#include <stdio.h>
-#endif
-
 
 class Hex {
 private:
@@ -412,7 +406,7 @@ public:
 	virtual bool SetValue(std::string const& input,bool init);
 	virtual bool SetValue(std::string const& input) { return SetValue(input,/*init*/false); };
 	virtual const std::vector<Value>& GetValues() const;
-	virtual ~Prop_multival() { if (section != NULL) { delete section; } }
+	virtual ~Prop_multival() { delete section; }
 }; //value bevat totale string. setvalue zet elk van de sub properties en checked die.
 
 class Prop_multival_remain:public Prop_multival{

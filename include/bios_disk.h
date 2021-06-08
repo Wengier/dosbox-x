@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -19,16 +19,8 @@
 #ifndef DOSBOX_BIOS_DISK_H
 #define DOSBOX_BIOS_DISK_H
 
-#include <stdio.h>
-#include <stdlib.h>
-#ifndef DOSBOX_MEM_H
-#include "mem.h"
-#endif
 #ifndef DOSBOX_DOS_INC_H
 #include "dos_inc.h"
-#endif
-#ifndef DOSBOX_BIOS_H
-#include "bios.h"
 #endif
 #include "../src/dos/cdrom.h"
 
@@ -122,7 +114,7 @@ public:
 	virtual uint8_t Read_AbsoluteSector(uint32_t sectnum, void * data);
 	virtual uint8_t Write_AbsoluteSector(uint32_t sectnum, const void * data);
 
-	imageDiskD88(FILE *imgFile, uint8_t *imgName, uint32_t imgSizeK, bool isHardDisk);
+	imageDiskD88(FILE *imgFile, const char *imgName, uint32_t imgSizeK, bool isHardDisk);
 	virtual ~imageDiskD88();
 
     unsigned char fd_type_major;
@@ -161,7 +153,7 @@ public:
 	virtual uint8_t Read_AbsoluteSector(uint32_t sectnum, void * data);
 	virtual uint8_t Write_AbsoluteSector(uint32_t sectnum, const void * data);
 
-	imageDiskNFD(FILE *imgFile, uint8_t *imgName, uint32_t imgSizeK, bool isHardDisk, unsigned int revision);
+	imageDiskNFD(FILE *imgFile, const char *imgName, uint32_t imgSizeK, bool isHardDisk, unsigned int revision);
 	virtual ~imageDiskNFD();
 
     struct vfdentry {
@@ -191,7 +183,7 @@ public:
 	virtual uint8_t Read_AbsoluteSector(uint32_t sectnum, void * data);
 	virtual uint8_t Write_AbsoluteSector(uint32_t sectnum, const void * data);
 
-	imageDiskVFD(FILE *imgFile, uint8_t *imgName, uint32_t imgSizeK, bool isHardDisk);
+	imageDiskVFD(FILE *imgFile, const char *imgName, uint32_t imgSizeK, bool isHardDisk);
 	virtual ~imageDiskVFD();
 
     struct vfdentry {

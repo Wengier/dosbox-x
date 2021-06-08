@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,16 +25,6 @@
 #endif
 #ifndef DOSBOX_DOS_INC_H
 #include "dos_inc.h"
-#endif
-
-#ifndef CH_LIST
-#define CH_LIST
-#include <list>
-#endif
-
-#ifndef CH_STRING
-#define CH_STRING
-#include <string>
 #endif
 
 class CommandLine {
@@ -101,8 +91,8 @@ class Program {
 public:
 	Program();                                          //! Constructor
 	virtual ~Program(){                                 //! Default destructor
-		if (cmd != NULL) delete cmd;
-		if (psp != NULL) delete psp;
+		delete cmd;
+		delete psp;
 	}
 
     /*! \brief      Exit status of the program
@@ -125,6 +115,6 @@ public:
 };
 
 typedef void (PROGRAMS_Main)(Program * * make);
-void PROGRAMS_MakeFile(char const * const name,PROGRAMS_Main * SDL_main);
+void PROGRAMS_MakeFile(char const * const name,PROGRAMS_Main * SDL_main,const char *dir="");
 
 #endif

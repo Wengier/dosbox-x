@@ -2,7 +2,7 @@
 /* Hand-edited by Jonathan Campbell for Visual Studio 2008 */
 
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -124,14 +124,20 @@
 /* Define to 1 if you have libpng */
 #define C_LIBPNG 1
 
+/* Define to 1 if you have libz */
+#define C_LIBZ 1
+
 /* Define to 1 to enable internal modem support, requires SDL_net */
 #define C_MODEM 1
 
 /* Define to 1 to enable internal printer redirection support*/
 #define C_PRINTER 1
 
-/* Define to 1 to enable NE2000 ethernet passthrough, requires libpcap */
-#define C_NE2000 1
+/* Define to 1 to enable ethernet passthrough, requires libpcap */
+#define C_PCAP 1
+
+/* Define to 1 to enable userspace TCP/IP emulation, requires libslirp */
+/* #undef C_SLIRP */
 
 /* Set to 1 to enable SDL 1.x support */
 #define C_SDL1 1

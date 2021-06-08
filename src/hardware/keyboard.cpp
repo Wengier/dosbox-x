@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2002-2020  The DOSBox Team
+ *  Copyright (C) 2002-2021  The DOSBox Team
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -16,6 +16,7 @@
  *  51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  */
 
+#include <assert.h>
 
 #include "dosbox.h"
 #include "keyboard.h"
@@ -31,6 +32,7 @@
 #include "timer.h"
 #include <math.h>
 #include "8255.h"
+#include "jfont.h"
 
 #if defined(_MSC_VER)
 # pragma warning(disable:4244) /* const fmath::local::uint64_t to double possible loss of data */
@@ -554,7 +556,7 @@ static void write_p60(Bitu port,Bitu val,Bitu iolen) {
             keyb.scanning=true;
             break;
         case 0xf5:   /* Reset keyboard and disable scanning */
-            LOG(LOG_KEYBOARD,LOG_NORMAL)("Reset, disable scanning");            
+            LOG(LOG_KEYBOARD,LOG_NORMAL)("Reset, disable scanning");
             keyb.scanning=false;
             KEYBOARD_AddBuffer(0xfa);   /* Acknowledge */
             break;
@@ -1412,13 +1414,13 @@ void KEYBOARD_AddKey1(KBD_KEYS keytype,bool pressed) {
     case KBD_esc:ret=1;break;
     case KBD_1:ret=2;break;
     case KBD_2:ret=3;break;
-    case KBD_3:ret=4;break;     
+    case KBD_3:ret=4;break;
     case KBD_4:ret=5;break;
     case KBD_5:ret=6;break;
-    case KBD_6:ret=7;break;     
+    case KBD_6:ret=7;break;
     case KBD_7:ret=8;break;
     case KBD_8:ret=9;break;
-    case KBD_9:ret=10;break;        
+    case KBD_9:ret=10;break;
     case KBD_0:ret=11;break;
 
     case KBD_minus:ret=12;break;
@@ -1427,15 +1429,15 @@ void KEYBOARD_AddKey1(KBD_KEYS keytype,bool pressed) {
     case KBD_backspace:ret=14;break;
     case KBD_tab:ret=15;break;
 
-    case KBD_q:ret=16;break;        
+    case KBD_q:ret=16;break;
     case KBD_w:ret=17;break;
-    case KBD_e:ret=18;break;        
+    case KBD_e:ret=18;break;
     case KBD_r:ret=19;break;
-    case KBD_t:ret=20;break;        
+    case KBD_t:ret=20;break;
     case KBD_y:ret=21;break;
-    case KBD_u:ret=22;break;        
+    case KBD_u:ret=22;break;
     case KBD_i:ret=23;break;
-    case KBD_o:ret=24;break;        
+    case KBD_o:ret=24;break;
     case KBD_p:ret=25;break;
 
     case KBD_leftbracket:ret=26;break;
@@ -1450,10 +1452,10 @@ void KEYBOARD_AddKey1(KBD_KEYS keytype,bool pressed) {
     case KBD_s:ret=31;break;
     case KBD_d:ret=32;break;
     case KBD_f:ret=33;break;
-    case KBD_g:ret=34;break;        
-    case KBD_h:ret=35;break;        
+    case KBD_g:ret=34;break;
+    case KBD_h:ret=35;break;
     case KBD_j:ret=36;break;
-    case KBD_k:ret=37;break;        
+    case KBD_k:ret=37;break;
     case KBD_l:ret=38;break;
 
     case KBD_semicolon:ret=39;break;
@@ -1584,6 +1586,25 @@ void KEYBOARD_AddKey1(KBD_KEYS keytype,bool pressed) {
     case KBD_lwindows:extend=true;ret=0x5B;break;
     case KBD_rwindows:extend=true;ret=0x5C;break;
     case KBD_rwinmenu:extend=true;ret=0x5D;break;
+	case KBD_underscore:ret = 86; break;//for AX layout
+	case KBD_yen:ret = 43; break;//for AX layout
+	case KBD_conv:ret = (INT16_AX_GetKBDBIOSMode() == 0x51)? 0x5b: 57; break;//for AX layout
+	case KBD_nconv:ret = (INT16_AX_GetKBDBIOSMode() == 0x51) ? 0x5a: 57; break;//for AX layout
+	case KBD_ax:ret = (INT16_AX_GetKBDBIOSMode() == 0x51) ? 0x5c: 0; break;//for AX layout
+		/* System Scan Code for AX keys 
+		JP mode  Make    Break    US mode  Make    Break
+		–³•ÏŠ·   5Ah     DAh      Space    39h(57) B9h
+		•ÏŠ·     5Bh     DBh      Space    39h(57) B9h
+		Š¿Žš     E0h-38h E0h-B8h  RAlt     (status flag)
+		AX       5Ch     DCh      (unused)
+		*/
+		/* Character code in JP mode (implemented in KBD BIOS)
+		Key         Ch Sh Ct Al
+		5A –³•ÏŠ· - AB AC AD AE
+		5B •ÏŠ·   - A7 A8 A9 AA
+		38 Š¿Žš   - 3A 3A
+		5c AX     - D2 D3 D4 D5
+		*/ 
     case KBD_jp_muhenkan:ret=0x7B;break;
     case KBD_jp_henkan:ret=0x79;break;
     case KBD_jp_hiragana:ret=0x70;break;/*also Katakana */
@@ -1596,7 +1617,7 @@ void KEYBOARD_AddKey1(KBD_KEYS keytype,bool pressed) {
 
     /* Add the actual key in the keyboard queue */
     if (pressed) {
-        if (keyb.repeat.key == keytype) keyb.repeat.wait = keyb.repeat.rate;        
+        if (keyb.repeat.key == keytype) keyb.repeat.wait = keyb.repeat.rate;
         else keyb.repeat.wait = keyb.repeat.pause;
         keyb.repeat.key = keytype;
     } else {
