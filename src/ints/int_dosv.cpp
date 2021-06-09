@@ -519,8 +519,10 @@ bool MakeSbcs19Font() {
 	InitFontHandle();
 	bool fail=false;
 	for(Bitu code = 0 ; code < 256 ; code++) {
-		if(true||!GetWindowsFont(code, &jfont_sbcs_19[code * 19 + 1], 8, 16))
+		if(!GetWindowsFont(code, &jfont_sbcs_19[code * 19 + 1], 8, 16)) {
 			fail=true;
+			break;
+		}
 	}
 	if (fail) memcpy(jfont_sbcs_19, JPNHN19X+NAME_LEN+ID_LEN+3, SBCS19_LEN);
 	if (IS_DOSV) memcpy(jfont_sbcs_19, dosv_font19_data, sizeof(dosv_font19_data));
