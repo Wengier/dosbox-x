@@ -230,7 +230,7 @@ bool GetWindowsFont(Bitu code, uint8_t *buff, int width, int height)
 {
 #if defined(LINUX)
 	XRectangle ir, lr;
-	uint16_t text[4];
+	wchar_t text[4];
 
 	if(code < 0x100) {
 		if(code == 0x5c) {
@@ -247,7 +247,7 @@ bool GetWindowsFont(Bitu code, uint8_t *buff, int width, int height)
 		src[0] = code >> 8;
 		src[1] = code & 0xff;
 		src[2] = 0;
-		CodePageGuestToHostUTF16(text,src);
+		CodePageGuestToHostUTF16((uint16_t *)text,src);
 		text[0] &= 0xffff;
 	}
 	text[1] = ']';
