@@ -45,6 +45,15 @@
 #define DBCS24_LEN 65536 * 72
 #define SBCS24_LEN 256 * 48
 
+#if defined(LINUX)
+static Display *font_display;
+static Window font_window;
+static Pixmap font_pixmap;
+static GC font_gc;
+static XFontSet font_set16;
+static XFontSet font_set24;
+#endif
+
 const char jfont_name[] = "\x082\x06c\x082\x072\x020\x083\x053\x083\x056\x083\x062\x083\x04e";
 static uint8_t jfont_dbcs[96];
 uint8_t jfont_sbcs_19[SBCS19_LEN];//256 * 19( * 8)
