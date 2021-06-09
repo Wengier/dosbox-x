@@ -95,6 +95,7 @@ uint8_t TrueVideoMode;
 void ResolvePath(std::string& in);
 void SetIMPosition();
 bool INT10_SetDOSVModeVtext(uint16_t mode, enum DOSV_VTEXT_MODE vtext_mode);
+bool CodePageGuestToHostUTF16(uint16_t *d/*CROSS_LEN*/,const char *s/*CROSS_LEN*/);
 
 Bitu getfontx2header(FILE *fp, fontx_h *header)
 {
@@ -229,7 +230,7 @@ bool GetWindowsFont(Bitu code, uint8_t *buff, int width, int height)
 {
 #if defined(LINUX)
 	XRectangle ir, lr;
-	wchar_t text[4];
+	uint16_t text[4];
 
 	if(code < 0x100) {
 		if(code == 0x5c) {
@@ -246,7 +247,7 @@ bool GetWindowsFont(Bitu code, uint8_t *buff, int width, int height)
 		src[0] = code >> 8;
 		src[1] = code & 0xff;
 		src[2] = 0;
-		sjis_to_utf16_copy((char *)text, src, 2);
+		CodePageGuestToHostUTF16(text,src);
 		text[0] &= 0xffff;
 	}
 	text[1] = ']';
