@@ -30,6 +30,11 @@
 #include "dos_inc.h"
 #define INCJFONT 1
 #include "jfont.h"
+#if defined(LINUX)
+#include <X11/Xlib.h>
+#include <X11/Xlocale.h>
+#include <X11/Xutil.h>
+#endif
 
 #define ID_LEN 6
 #define NAME_LEN 8
@@ -523,7 +528,7 @@ bool MakeSbcs24Font() {
 }
 
 void JFONT_Init() {
-#if defined(WIN32)
+#if defined(WIN32) && !defined(HX_DOS) && !defined(C_SDL2) && defined(SDL_DOSBOX_X_SPECIAL)
 	SDL_SetCompositionFontName(jfont_name);
 #endif
     Section_prop *section = static_cast<Section_prop *>(control->GetSection("render"));
