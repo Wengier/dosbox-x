@@ -114,7 +114,7 @@ bool isKanji1(uint8_t chr) {
 
 bool isKanji2(uint8_t chr) {
     if (dos.loaded_codepage == 936 || dos.loaded_codepage == 949 || dos.loaded_codepage == 950)
-        return chr >= 0x40 && chr <= 0xfc;
+        return chr >= 0x40 && chr <= 0xfe;
     return (chr >= 0x40 && chr <= 0x7e) || (chr >= 0x80 && chr <= 0xfc);
 }
 
@@ -254,10 +254,10 @@ bool GetWindowsFont(Bitu code, uint8_t *buff, int width, int height)
 	wchar_t text[4];
 
 	if(code < 0x100) {
-		if(code == 0x5c) {
+		if(code == 0x5c && !(IS_DOSV && !IS_JDOSV)) {
 			// yen
 			text[0] = 0xa5;
-		} else if(code >= 0xa1 && code <= 0xdf) {
+		} else if(code >= 0xa1 && code <= 0xdf && !(IS_DOSV && !IS_JDOSV)) {
 			// half kana
 			text[0] = 0xff61 + (code - 0xa1);
 		} else {
@@ -268,7 +268,7 @@ bool GetWindowsFont(Bitu code, uint8_t *buff, int width, int height)
 		src[0] = code >> 8;
 		src[1] = code & 0xff;
 		src[2] = 0;
-		CodePageGuestToHostUTF16((uint16_t *)text,src);
+		if (!CodePageGuestToHostUTF16((uint16_t *)text,src)) return false;
 		text[0] &= 0xffff;
 	}
 	text[1] = ']';
@@ -513,7 +513,7 @@ void InitFontHandle()
 	if(jfont_16 == NULL || jfont_24 == NULL) {
 		LOGFONT lf = { 0 };
 		lf.lfHeight = 16;
-		lf.lfCharSet = IS_KDOSV?HANGUL_CHARSET:(IS_CDOSV?CHINESEBIG5_CHARSET:(IS_PDOSV?GB2312_CHARSET:SHIFTJIS_CHARSET));
+		lf.lfCharSet = IS_KDOSV||(!IS_DOSV&&dos.loaded_codepage==949)?HANGUL_CHARSET:(IS_CDOSV||(!IS_DOSV&&dos.loaded_codepage==950)?CHINESEBIG5_CHARSET:(IS_PDOSV||(!IS_DOSV&&dos.loaded_codepage==936)?GB2312_CHARSET:SHIFTJIS_CHARSET));
 		lf.lfOutPrecision = OUT_DEFAULT_PRECIS;
 		lf.lfClipPrecision = CLIP_DEFAULT_PRECIS;
 		lf.lfQuality = DEFAULT_QUALITY;
