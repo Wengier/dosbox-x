@@ -54,6 +54,8 @@
 #include "dosbox.h"
 #include "debug.h"
 #include "cpu.h"
+#include "logging.h"
+#include "menudef.h"
 #include "video.h"
 #include "pic.h"
 #include "cpu.h"
@@ -305,7 +307,7 @@ extern bool rom_bios_8x8_cga_font;
 extern bool allow_port_92_reset;
 extern bool allow_keyb_reset;
 
-extern bool DOSBox_Paused();
+extern bool DOSBox_Paused(), isDBCSCP(), InitCodePage();
 
 //#define DEBUG_CYCLE_OVERRUN_CALLBACK
 
@@ -757,9 +759,10 @@ std::string dosbox_title;
 
 void DOSBOX_InitTickLoop() {
     LOG(LOG_MISC,LOG_DEBUG)("Initializing tick loop management");
+    Section_prop *section = static_cast<Section_prop *>(control->GetSection("cpu"));
 
     ticksRemain = 0;
-    ticksLocked = false;
+    ticksLocked = section->Get_bool("turbo");
     ticksLastRTtime = 0;
     ticksLast = GetTicks();
     ticksLastRTcounter = GetTicks();
@@ -1036,16 +1039,19 @@ void DOSBOX_RealInit() {
     const char *dosvstr = dos_section->Get_string("dosv");
     if (!strcasecmp(dosvstr, "jp")) dos.set_jdosv_enabled = true;
     if (!strcasecmp(dosvstr, "ko")) dos.set_kdosv_enabled = true;
-    if (!strcasecmp(dosvstr, "chs")) dos.set_pdosv_enabled = true;
-    if (!strcasecmp(dosvstr, "cht")) dos.set_cdosv_enabled = true;
+    if (!strcasecmp(dosvstr, "chs")||!strcasecmp(dosvstr, "cn")) dos.set_pdosv_enabled = true;
+    if (!strcasecmp(dosvstr, "cht")||!strcasecmp(dosvstr, "tw")) dos.set_cdosv_enabled = true;
     if (svgaCard != SVGA_TsengET4K && svgaCard != SVGA_S3Trio) {
         LOG_MSG("WARNING: DOS/V is only supported for SVGA_TsengET4K and SVGA_S3Trio video cards.");
         dos.set_jdosv_enabled = dos.set_kdosv_enabled = dos.set_pdosv_enabled = dos.set_cdosv_enabled = false;
     }
-    if (IS_JEGA_ARCH || IS_DOSV) {
-        JFONT_Init();  // Load DBCS fonts for JEGA
+    int cp = dos.loaded_codepage;
+    if (!cp) InitCodePage();
+    if (IS_JEGA_ARCH || IS_DOSV || isDBCSCP()) {
+        JFONT_Init();  // Load DBCS fonts for JEGA etc
         if (IS_DOSV) DOSV_SetConfig(dos_section);
     }
+    dos.loaded_codepage = cp;
 #if defined(WIN32) && !defined(HX_DOS) && !defined(C_SDL2) && defined(SDL_DOSBOX_X_SPECIAL)
     if (enableime && !control->opt_silent) {
         dos.im_enable_flag = true;
@@ -1167,7 +1173,7 @@ void DOSBOX_SetupConfigSections(void) {
     const char* serials[] = { "dummy", "disabled", "modem", "nullmodem", "serialmouse", "directserial", "log", "file", 0 };
     const char* acpi_rsd_ptr_settings[] = { "auto", "bios", "ebda", 0 };
     const char* cpm_compat_modes[] = { "auto", "off", "msdos2", "msdos5", "direct", 0 };
-    const char* dosv_settings[] = { "off", "jp", "ko", "chs", "cht", 0 };
+    const char* dosv_settings[] = { "off", "jp", "ko", "chs", "cht", "cn", "tw", 0 };
     const char* acpisettings[] = { "off", "1.0", "1.0b", "2.0", "2.0a", "2.0b", "2.0c", "3.0", "3.0a", "3.0b", "4.0", "4.0a", "5.0", "5.0a", "6.0", 0 };
     const char* guspantables[] = { "old", "accurate", "default", 0 };
     const char *sidbaseno[] = { "240", "220", "260", "280", "2a0", "2c0", "2e0", "300", 0 };
@@ -2341,6 +2347,9 @@ void DOSBOX_SetupConfigSections(void) {
 	Pstring = secprop->Add_path("jfontdbcs",Property::Changeable::OnlyAtStart,"");
 	Pstring->Set_help("FONTX2 file used to rendering DBCS characters (16x16) in DOS/V or JEGA mode. If not specified, the default one will be used.");
 
+	Pstring = secprop->Add_path("jfontdbcs14",Property::Changeable::OnlyAtStart,"");
+	Pstring->Set_help("FONTX2 file used to rendering SBCS characters (14x14) for the Configuration Tool. If not specified, the default one will be used.");
+
 	Pstring = secprop->Add_path("jfontdbcs24",Property::Changeable::OnlyAtStart,"");
 	Pstring->Set_help("FONTX2 file used to rendering SBCS characters (24x24) in DOS/V mode.");
 
@@ -2571,6 +2580,10 @@ void DOSBOX_SetupConfigSections(void) {
     Pint = secprop->Add_int("cycle emulation percentage adjust",Property::Changeable::Always,0);
     Pint->SetMinMax(-50,50);
     Pint->Set_help("The percentage adjustment for use with the \"Emulate CPU speed\" feature. Default is 0 (no adjustment), but you can adjust it (between -25% and 25%) if necessary.");
+
+    Pbool = secprop->Add_bool("turbo",Property::Changeable::Always,false);
+    Pbool->Set_help("Enables Turbo (Fast Forward) mode to speed up operations.");
+    Pbool->SetBasic(true);
 
     Pstring = secprop->Add_string("use dynamic core with paging on",Property::Changeable::Always,"auto");
     Pstring->Set_values(truefalseautoopt);
@@ -3760,6 +3773,9 @@ void DOSBOX_SetupConfigSections(void) {
                       "Set this option to true to prevent SCANDISK.EXE from attempting scan and repair drive Z:\n"
                       "which is impossible since Z: is a virtual drive not backed by a disk filesystem.");
 
+    Pbool = secprop->Add_bool("drive z expand path",Property::Changeable::WhenIdle,true);
+    Pbool->Set_help("If set, DOSBox-X will automatically expand the %PATH% environment variable to include the subdirectories on the Z drive.");
+
     Pstring = secprop->Add_string("drive z hide files",Property::Changeable::OnlyAtStart,"/TEXTUTIL\\25.COM /TEXTUTIL\\28.COM /TEXTUTIL\\50.COM");
     Pstring->Set_help("The files or directories listed here (separated by space) will be either hidden or removed from the Z drive.\n"
                       "Files with leading forward slashs (e.g. \"/DEBUG\\BIOSTEST.COM\") will become hidden files (DIR /A will list them).");
@@ -3772,8 +3788,10 @@ void DOSBOX_SetupConfigSections(void) {
                     "NOTE: This option has no effect in PC-98 mode where MS-DOS systems integrate ANSI.SYS into the DOS kernel.");
     Pbool->SetBasic(true);
 
-    Pbool = secprop->Add_bool("log console",Property::Changeable::WhenIdle,false);
-    Pbool->Set_help("If set, log DOS CON output to the log file.");
+    Pstring = secprop->Add_string("log console",Property::Changeable::WhenIdle,"false");
+    Pstring->Set_values(automountopts);
+    Pstring->Set_help("If set, log DOS CON output to the log file. Setting to \"quiet\" will log DOS CON output only (no debugging output).");
+    Pstring->SetBasic(true);
 
     Pint = secprop->Add_int("dos sda size",Property::Changeable::WhenIdle,0);
     Pint->Set_help("SDA (swappable data area) size, in bytes. Set to 0 to use a reasonable default.");
@@ -3863,11 +3881,10 @@ void DOSBOX_SetupConfigSections(void) {
     Pstring->Set_values(dosv_settings);
     Pstring->Set_help("Enable DOS/V emulation and specify which version to emulate. This option is intended for\n"
             "use with games or software originating from East Asia that use the double byte character set (DBCS)\n"
-            "encodings and DOS/V extensions to display Japanese (jp), Chinese (chs or cht), or Korean (ko) text.\n"
+            "encodings and DOS/V extensions to display Japanese (jp), Chinese (chs/cht/cn/tw), or Korean (ko) text.\n"
             "Note that enabling DOS/V replaces 80x25 text mode (INT 10h mode 3) with a EGA/VGA graphics\n"
             "mode that emulates text mode to display the characters and may be incompatible with non-Asian\n"
-            "software that assumes direct access to the text mode via segment 0xB800.\n"
-            "Note: Only Japanese DOS/V extension is supported at this time.");
+            "software that assumes direct access to the text mode via segment 0xB800.");
     Pstring->SetBasic(true);
 
 	const char* fepcontrol_settings[] = { "ias", "mskanji", "both", 0};
@@ -4401,6 +4418,60 @@ void DOSBOX_SetupConfigSections(void) {
         "# To write out ALL options, use command 'config -all' with -wc or -writeconf options.\n");
     MSG_Add("CONFIG_SUGGESTED_VALUES", "Possible values");
     MSG_Add("CONFIG_ADVANCED_OPTION", "Advanced options (see full configuration reference file [dosbox-x.reference.full.conf] for more details)");
+    MSG_Add("CONFIG_TOOL","DOSBox-X Configuration Tool");
+    MSG_Add("CONFIG_TOOL_EXIT","Exit configuration tool");
+    MSG_Add("WARNING","Warning");
+    MSG_Add("YES","Yes");
+    MSG_Add("NO","No");
+    MSG_Add("OK","OK");
+    MSG_Add("CANCEL","Cancel");
+    MSG_Add("CLOSE","Close");
+    MSG_Add("ADD","Add");
+    MSG_Add("DEL","Del");
+    MSG_Add("NEXT","Next");
+    MSG_Add("CAPT","Capt");
+    MSG_Add("EXIT","Exit");
+    MSG_Add("SAVE","Save");
+    MSG_Add("SAVE_CONFIGURATION","Save configuration");
+    MSG_Add("SAVE_LANGUAGE","Save language file");
+    MSG_Add("SAVE_RESTART","Save & Restart");
+    MSG_Add("PASTE_CLIPBOARD","Paste Clipboard");
+    MSG_Add("APPEND_HISTORY","Append History");
+    MSG_Add("EXECUTE_NOW","Execute Now");
+    MSG_Add("ADDITION_CONTENT","Additional Content:");
+    MSG_Add("CONTENT","Content:");
+    MSG_Add("EDIT_FOR","Edit %s");
+    MSG_Add("HELP_FOR","Help for %s");
+    MSG_Add("CONFIGURATION_FOR","Configuration for %s");
+    MSG_Add("CONFIGURATION","Configuration");
+    MSG_Add("SETTINGS","Settings");
+    MSG_Add("HELP","Help");
+    MSG_Add("VISIT_HOMEPAGE","Visit Homepage");
+    MSG_Add("GET_STARTED","Getting Started");
+    MSG_Add("CDROM_SUPPORT","CD-ROM Support");
+    MSG_Add("DRIVE_INFORMATION","Drive information");
+    MSG_Add("MOUNTED_DRIVE_NUMBER","Mounted drive numbers");
+    MSG_Add("IDE_CONTROLLER_ASSIGNMENT","IDE controller assignment");
+    MSG_Add("HELP_COMMAND","Help on DOS command");
+    MSG_Add("CURRENT_VOLUME","Current sound mixer volumes");
+    MSG_Add("CURRENT_SBCONFIG","Sound Blaster configuration");
+    MSG_Add("CURRENT_MIDICONFIG","Current MIDI configuration");
+    MSG_Add("CREATE_IMAGE","Create blank disk image");
+    MSG_Add("NETWORK_LIST","Network interface list");
+    MSG_Add("PRINTER_LIST","Printer device list");
+    MSG_Add("INTRODUCTION_TO","Introduction to DOSBox-X");
+    MSG_Add("INTRODUCTION","Introduction");
+    MSG_Add("ABOUT","About");
+    MSG_Add("CONFIGURE_GROUP", "Choose a settings group to configure:");
+    MSG_Add("SHOW_ADVOPT", "Show advanced options");
+    MSG_Add("USE_PRIMARYCONFIG", "Use primary config file");
+    MSG_Add("USE_PORTABLECONFIG", "Use portable config file");
+    MSG_Add("USE_USERCONFIG", "Use user config file");
+    MSG_Add("CONFIG_SAVETO", "Enter filename for the configuration file to save to:");
+    MSG_Add("CONFIG_SAVEALL", "Save all (including advanced) config options to the configuration file");
+    MSG_Add("LANG_FILENAME", "Enter filename for language file:");
+    MSG_Add("LANG_LANGNAME", "Language name (optional):");
+    MSG_Add("INTRO_MESSAGE", "Welcome to DOSBox-X, a free and complete DOS emulation package.\nDOSBox-X creates a DOS shell which looks like the plain DOS.\nYou can also run Windows 3.x and 95/98 inside the DOS machine.");
     MSG_Add("DRIVE","Drive");
     MSG_Add("TYPE","Type");
     MSG_Add("LABEL","Label");
@@ -4410,6 +4481,11 @@ void DOSBOX_SetupConfigSections(void) {
     MSG_Add("SWAP_SLOT","Swap slot");
     MSG_Add("EMPTY_SLOT","Empty slot");
     MSG_Add("SLOT","Slot");
+    MSG_Add("PREVIOUS_PAGE","< Previous Page");
+    MSG_Add("NEXT_PAGE"," Next Page >");
+    MSG_Add("SELECT_EVENT", "Select an event to change.");
+    MSG_Add("SELECT_DIFFERENT_EVENT", "Select a different event or hit the Add/Del/Next buttons.");
+    MSG_Add("MAPPER_FILE_SAVED", "Mapper file saved");
     MSG_Add("AUTO_CYCLE_MAX","Auto cycles [max]");
     MSG_Add("AUTO_CYCLE_AUTO","Auto cycles [auto]");
     MSG_Add("AUTO_CYCLE_OFF","Auto cycles [off]");

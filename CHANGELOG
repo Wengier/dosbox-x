@@ -8,6 +8,23 @@
     listed in the common config reference file (i.e.
     dosbox-x.reference.conf) too. Several previously
     advanced options are now common options. (Wengier)
+  - Added option "drive z expand path" which when set
+    to true (default) will automatically expand %PATH%
+    environment variable to include the subdirectories
+    on the Z drive when only the Z:\ path is specified
+    for compatibility purposes. (Wengier)
+  - Added option "turbo" in [cpu] section to enable
+    Turbo (Fast Forward) mode at start. You can also
+    change it from the command-line via CONFIG command
+    (e.g. "config -set turbo=true"). (Wengier)
+  - Added value "quiet" to "log console" config option
+    to only log DOS console outputs. (Wengier)
+  - It is now possible to translate text for graphical
+    Configuration Tool and Mapper Editor interfaces.
+    The size/position of some buttons in Configuration
+    Tool are adjusted accordingly as well. (Wengier)
+  - Config option "usescancodes=auto" now implies false
+    for PC-98 mode in SDL1 builds. (Wengier)
   - For PC-98 mode, if both FONT.ROM and FREECG98.BMP
     are not found, then DOSBox-X will now use internal
     Japanese fonts in addition to VGA font. (Wengier)
@@ -15,7 +32,14 @@
     section will enable low ASCII boxing characters
     for the TrueType font (TTF) output too. This option
     is now enabled by default for JP mode. (Wengier)
-  - Added support for inputing Chinese/Japanese/Korean
+  - Added support for showing Chinese/Japanese/Korean
+    characters in the SDL-drawn menu (except for OpenGL
+    outputs, where only SBCS code pages are supported)
+    and Configuration Tool interface (so for example
+    the DOS command help will show correctly). You can
+    change the DBCS font used by the Configuration Tool
+    interface via jdbcsfont14 config option. (Wengier)
+  - Added support for inputing CJK (at least Chinese)
     characters using the system input method (IME) in
     Windows SDL1 build. There is config option "ime" in
     [dosbox] section to control it. When set to "auto"
@@ -30,8 +54,9 @@
     section for the DOS/V support. (Wengier)
   - Added support for Japanese EGA mode (machine=jega)
     by adopting code from DOSVAX. You can optionally
-    set SBCS and DBCS fonts with jfontsbcs & jfontdbcs
-    config options in [render] section, or the default
+    set SBCS and DBCS fonts with jfontsbcs, jfontdbcs
+    (and jfontsbcs19, jfontdbcs24, etc) config options
+    in [render] section of config file, or the default
     fonts will be used for them. (Wengier)
 0.83.14
   - Added support for directories on the Z drive, so
@@ -44,7 +69,11 @@
     Z drive are now categorized into directories, with
     addition of some files/programs, such as additional
     4DOS files, text utilities in TEXTUTIL directory
-    and TITLE command to change window title. (Wengier)
+    and TITLE command to change window title. Default
+    value of the %PATH% envonment variable has been
+    expanded to include these subdirectories, but if
+    you use a custom path then you may want to include
+    these directories in your %PATH%. (Wengier)
   - You can now specify a command shell located on a
     mounted local drive via SHELL= command in [config]
     section of config file after the drive is properly

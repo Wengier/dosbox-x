@@ -20,7 +20,10 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <sys/stat.h>
+
 #include "dosbox.h"
+#include "logging.h"
 #include "regs.h"
 #include "control.h"
 #include "shell.h"
@@ -48,7 +51,7 @@
 
 extern bool startcmd, startwait, startquiet, winautorun;
 extern bool dos_shell_running_program, mountwarning;
-extern bool halfwidthkana, force_conversion;
+extern bool halfwidthkana, force_conversion, nokanji;
 extern bool addovl, addipx, enableime;
 extern const char* RunningProgram;
 extern uint16_t countryNo;
@@ -535,12 +538,16 @@ const char *ParseMsg(const char *msg) {
 #endif
         if (uselowbox || IS_JEGA_ARCH || IS_JDOSV) {
             std::string m=msg;
-            msg = str_replace((char *)msg, "\xC9", (char *)std::string(1, 1).c_str());
-            msg = str_replace((char *)msg, "\xBB", (char *)std::string(1, 2).c_str());
-            msg = str_replace((char *)msg, "\xC8", (char *)std::string(1, 3).c_str());
-            msg = str_replace((char *)msg, "\xBC", (char *)std::string(1, 4).c_str());
-            msg = str_replace((char *)msg, "\xBA", (char *)std::string(1, 5).c_str());
-            msg = str_replace((char *)msg, "\xCD", (char *)std::string(1, 6).c_str());
+            if (strstr(msg, "\xCD\xCD\xCD\xCD") != NULL) {
+                msg = str_replace((char *)msg, "\xC9", (char *)std::string(1, 1).c_str());
+                msg = str_replace((char *)msg, "\xBB", (char *)std::string(1, 2).c_str());
+                msg = str_replace((char *)msg, "\xC8", (char *)std::string(1, 3).c_str());
+                msg = str_replace((char *)msg, "\xBC", (char *)std::string(1, 4).c_str());
+                msg = str_replace((char *)msg, "\xCD", (char *)std::string(1, 6).c_str());
+            } else {
+                msg = str_replace((char *)msg, "\xBA ", (char *)(std::string(1, 5)+" ").c_str());
+                msg = str_replace((char *)msg, " \xBA", (char *)(" "+std::string(1, 5)).c_str());
+            }
         }
         return msg;
     }
@@ -551,6 +558,19 @@ static char const * const comspec_string="COMSPEC=Z:\\COMMAND.COM";
 static char const * const prompt_string="PROMPT=$P$G";
 static char const * const full_name="Z:\\COMMAND.COM";
 static char const * const init_line="/INIT AUTOEXEC.BAT";
+
+void GetExpandedPath(std::string &path) {
+    if (path=="Z:\\"||path=="z:\\")
+        path=path_string+5;
+    else if (path.size()>3&&(path.substr(0, 4)=="Z:\\;"||path.substr(0, 4)=="z:\\;")&&path.substr(4).find("Z:\\")==std::string::npos&&path.substr(4).find("z:\\")==std::string::npos)
+        path=std::string(path_string+5)+path.substr(3);
+    else if (path.size()>3) {
+        size_t pos = path.find(";Z:\\");
+        if (pos == std::string::npos) pos = path.find(";z:\\");
+        if (pos != std::string::npos && (!path.substr(pos+4).size() || path[pos+4]==';'&&path.substr(pos+4).find("Z:\\")==std::string::npos&&path.substr(pos+4).find("z:\\")==std::string::npos))
+            path=path.substr(0, pos+1)+std::string(path_string+5)+path.substr(pos+4);
+    }
+}
 
 void DOS_Shell::Prepare(void) {
     if (this == first_shell) {
@@ -585,9 +605,11 @@ void DOS_Shell::Prepare(void) {
                     "\x86\x44\x86\x44\x86\x44\x86\x44\x86\x44\x86\x44\x86\x44\x86\x44\x86\x44\x86\x5E\033[0m\n"));
                 WriteOut(ParseMsg((std::string("\033[1m\033[32m")+MSG_Get("SHELL_STARTUP_LAST")+"\033[0m\n").c_str()));
             } else {
+                nokanji=true;
                 WriteOut(ParseMsg("\033[44;1m\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD"
                     "\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD"
                     "\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB\033[0m"));
+                nokanji=false;
                 WriteOut(ParseMsg((std::string("\033[44;1m\xBA \033[32m")+(MSG_Get("SHELL_STARTUP_TITLE")+std::string("             ")).substr(0,30)+std::string(" \033[33m%*s\033[37m \xBA\033[0m")).c_str()),45,verstr.c_str());
                 WriteOut(ParseMsg("\033[44;1m\xBA                                                                              \xBA\033[0m"));
                 WriteOut(ParseMsg((std::string("\033[44;1m\xBA ")+MSG_Get("SHELL_STARTUP_HEAD1")+std::string(" \xBA\033[0m")).c_str()));
@@ -609,9 +631,11 @@ void DOS_Shell::Prepare(void) {
                 WriteOut(ParseMsg((std::string("\033[44;1m\xBA ")+MSG_Get("SHELL_STARTUP_HEAD3")+std::string(" \xBA\033[0m")).c_str()));
                 WriteOut(ParseMsg("\033[44;1m\xBA                                                                              \xBA\033[0m"));
                 WriteOut(ParseMsg((std::string("\033[44;1m\xBA ")+str_replace((char *)MSG_Get("SHELL_STARTUP_TEXT3"), "\n", " \xBA\033[0m\033[44;1m\xBA ")+std::string(" \xBA\033[0m")).c_str()));
+                nokanji=true;
                 WriteOut(ParseMsg("\033[44;1m\xC8\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD"
                     "\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD"
                     "\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBC\033[0m"));
+                nokanji=false;
                 WriteOut(ParseMsg((std::string("\033[32m")+(MSG_Get("SHELL_STARTUP_LAST")+std::string("                                                       ")).substr(0,79)+std::string("\033[0m\n")).c_str()));
             }
         } else if (CurMode->type==M_TEXT || IS_PC98_ARCH)
@@ -631,6 +655,8 @@ void DOS_Shell::Prepare(void) {
 			else
 				countryNo = 1;
 		}
+		section = static_cast<Section_prop *>(control->GetSection("dos"));
+		bool zdirpath = section->Get_bool("drive z expand path");
 		strcpy(config_data, "");
 		section = static_cast<Section_prop *>(control->GetSection("config"));
 		if (section!=NULL&&!control->opt_noconfig) {
@@ -696,12 +722,7 @@ void DOS_Shell::Prepare(void) {
 						if (!strncasecmp(cmd, "set ", 4)) {
 							vstr=std::string(val);
 							ResolvePath(vstr);
-							if (!strcmp(cmd, "set path")) {
-								if (vstr=="Z:\\"||vstr=="z:\\")
-									vstr=path_string+5;
-								else if (vstr.size()>3&&(vstr.substr(0, 4)=="Z:\\;"||vstr.substr(0, 4)=="z:\\;")&&vstr.substr(4).find("Z:\\")==std::string::npos&&vstr.substr(4).find("z:\\")==std::string::npos)
-									vstr=vstr.substr(0, 3)+std::string(path_string+8)+vstr.substr(3);
-							}
+							if (zdirpath && !strcmp(cmd, "set path")) GetExpandedPath(vstr);
 							DoCommand((char *)(std::string(cmd)+"="+vstr).c_str());
 						} else if (!strcasecmp(cmd, "install")||!strcasecmp(cmd, "installhigh")||!strcasecmp(cmd, "device")||!strcasecmp(cmd, "devicehigh")) {
 							vstr=std::string(val);

@@ -25,8 +25,11 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+
 #include "programs.h"
 #include "callback.h"
+#include "logging.h"
 #include "regs.h"
 #include "support.h"
 #include "cross.h"
@@ -51,7 +54,7 @@ Bitu call_program;
 extern const char *modifier;
 extern std::string langname;
 extern int enablelfn, paste_speed, wheel_key, freesizecap, wpType, wpVersion, wpBG, wpFG, lastset, blinkCursor;
-extern bool dos_kernel_disabled, force_nocachedir, wpcolon, lockmount, enable_config_as_shell_commands, load, winrun, winautorun, startcmd, startwait, startquiet, mountwarning, wheel_guest, clipboard_dosapi, noremark_save_state, force_load_state, sync_time, manualtime, showbold, showital, showline, showsout, char512, printfont, dbcs_sbcs, autoboxdraw, halfwidthkana;
+extern bool dos_kernel_disabled, force_nocachedir, wpcolon, lockmount, enable_config_as_shell_commands, load, winrun, winautorun, startcmd, startwait, startquiet, mountwarning, wheel_guest, clipboard_dosapi, noremark_save_state, force_load_state, sync_time, manualtime, showbold, showital, showline, showsout, char512, printfont, dbcs_sbcs, autoboxdraw, halfwidthkana, ticksLocked;
 
 /* This registers a file on the virtual drive and creates the correct structure for it*/
 
@@ -91,6 +94,7 @@ public:
 
 static std::vector<InternalProgramEntry*> internal_progs;
 void EMS_Startup(Section* sec), EMS_DoShutDown(), resetFontSize(), UpdateDefaultPrinterFont();
+void DOSBOX_UnlockSpeed2( bool pressed );
 bool TTF_using();
 int setTTFCodePage();
 
@@ -1233,7 +1237,7 @@ void CONFIG::Run(void) {
 			std::string inputline = pvars[1] + "=" + value;
 			bool change_success = tsec->HandleInputline(inputline.c_str());
 			if (change_success) {
-				if (!strcasecmp(pvars[0].c_str(), "dosbox")||!strcasecmp(pvars[0].c_str(), "dos")||!strcasecmp(pvars[0].c_str(), "sdl")||!strcasecmp(pvars[0].c_str(), "render")) {
+				if (!strcasecmp(pvars[0].c_str(), "dosbox")||!strcasecmp(pvars[0].c_str(), "dos")||!strcasecmp(pvars[0].c_str(), "cpu")||!strcasecmp(pvars[0].c_str(), "sdl")||!strcasecmp(pvars[0].c_str(), "render")) {
 					Section_prop *section = static_cast<Section_prop *>(control->GetSection(pvars[0].c_str()));
 					if (section != NULL) {
 						if (!strcasecmp(pvars[0].c_str(), "dosbox")) {
@@ -1399,6 +1403,9 @@ void CONFIG::Run(void) {
 #if defined(USE_TTF)
 							if (TTF_using()) resetFontSize();
 #endif
+						} else if (!strcasecmp(pvars[0].c_str(), "cpu")) {
+							bool turbo = section->Get_bool("turbo");
+                            if (turbo != ticksLocked) DOSBOX_UnlockSpeed2(true);
 						} else if (!strcasecmp(pvars[0].c_str(), "dos")) {
 							mountwarning = section->Get_bool("mountwarning");
 							if (!strcasecmp(inputline.substr(0, 4).c_str(), "lfn=")) {

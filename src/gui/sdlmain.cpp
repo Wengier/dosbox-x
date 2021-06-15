@@ -58,6 +58,7 @@ extern bool blinking;
 extern bool dpi_aware_enable;
 extern bool log_int21;
 extern bool log_fileio;
+extern bool ticksLocked;
 extern bool enable_autosave;
 extern bool noremark_save_state;
 extern bool use_quick_reboot;
@@ -91,6 +92,7 @@ void GFX_OpenGLRedrawScreen(void), InitFontHandle();
 #include <sys/types.h>
 #include <algorithm> // std::transform
 #include <fcntl.h>
+#include <sys/stat.h>
 #ifdef WIN32
 # include <signal.h>
 # include <sys/stat.h>
@@ -102,6 +104,7 @@ void GFX_OpenGLRedrawScreen(void), InitFontHandle();
 #endif
 
 #include "dosbox.h"
+#include "menudef.h"
 #include "pic.h"
 #include "timer.h"
 #include "setup.h"
@@ -144,6 +147,10 @@ void GFX_OpenGLRedrawScreen(void), InitFontHandle();
 
 #if defined(WIN32) && !defined(HX_DOS)
 # include <shobjidl.h>
+#endif
+
+#if defined(WIN32)
+#include "resource.h"
 #endif
 
 #if defined(WIN32) && defined(__MINGW32__) /* MinGW does not have IID_ITaskbarList3 */
@@ -2489,14 +2496,10 @@ void MenuDrawTextChar(int &x,int y,unsigned char c,Bitu color,bool check) {
             } else if (isKanji2(c) && prevc > 1) {
                 bmp = GetDbcsFont(prevc*0x100+c);
                 prevc = 1;
-            } else
+            } else if (prevc < 0x81)
                 prevc = 0;
         } else
             prevc = 0;
-        if (font_16_init&&dos.loaded_codepage&&dos.loaded_codepage!=437&&!check&&!prevc)
-            bmp = (unsigned char*)int10_font_16_init + (c * fontHeight);
-        else if (!prevc)
-            bmp = (unsigned char*)int10_font_16 + (c * fontHeight);
 
         assert(sdl.surface->pixels != NULL);
 
@@ -2508,12 +2511,17 @@ void MenuDrawTextChar(int &x,int y,unsigned char c,Bitu color,bool check) {
             return;
 
         for (int i=0; i<(prevc?2:1); i++) {
+            if (font_16_init&&dos.loaded_codepage&&dos.loaded_codepage!=437&&!check&&prevc!=1)
+                bmp = (unsigned char*)int10_font_16_init + ((i||!prevc?c:prevc) * fontHeight);
+            else if (prevc!=1)
+                bmp = (unsigned char*)int10_font_16 + ((i||!prevc?c:prevc) * fontHeight);
+
             scan  = (unsigned char*)sdl.surface->pixels;
             scan += (unsigned int)y * (unsigned int)sdl.surface->pitch;
             scan += (unsigned int)x * (((unsigned int)sdl.surface->format->BitsPerPixel+7u)/8u);
 
             for (unsigned int row=0;row < fontHeight;row++) {
-                unsigned char rb = bmp[prevc?(row*2+i):row];
+                unsigned char rb = bmp[prevc==1?(row*2+i):row];
 
                 if (sdl.surface->format->BitsPerPixel == 32) {
                     uint32_t *dp = (uint32_t*)scan;
@@ -2687,6 +2695,9 @@ void MenuDrawText(int x,int y,const char *text,Bitu color,bool check=false) {
 void DOSBoxMenu::item::drawMenuItem(DOSBoxMenu &menu) {
     (void)menu;//UNUSED
 
+    int cp = dos.loaded_codepage;
+    if (!cp) InitCodePage();
+
     Bitu bgcolor = GFX_GetRGB(63, 63, 63);
     Bitu fgcolor = GFX_GetRGB(191, 191, 191);
     Bitu fgshortcolor = GFX_GetRGB(127, 127, 191);
@@ -2741,6 +2752,7 @@ void DOSBoxMenu::item::drawMenuItem(DOSBoxMenu &menu) {
 
     if (SDL_MUSTLOCK(sdl.surface))
         SDL_UnlockSurface(sdl.surface);
+    dos.loaded_codepage = cp;
 }
 
 void DOSBoxMenu::displaylist::DrawDisplayList(DOSBoxMenu &menu,bool updateScreen) {
@@ -2780,7 +2792,10 @@ void GFX_DrawSDLMenu(DOSBoxMenu &menu, DOSBoxMenu::displaylist &dl) {
         SDL_UnlockSurface(sdl.surface);
     }
 
+    int cp = dos.loaded_codepage;
+    if (!cp) InitCodePage();
     if (IS_PC98_ARCH || IS_JEGA_ARCH || isDBCSCP()) InitFontHandle();
+    dos.loaded_codepage = cp;
 #if 0
     LOG_MSG("menudraw %u",(unsigned int)SDL_GetTicks());
 #endif
@@ -5522,7 +5537,7 @@ static void GUI_StartUp() {
     MAPPER_AddHandler(ResetSystem, MK_r, MMODHOST, "reset", "Reset DOSBox-X", &item); /* Host+R (Host+CTRL+R acts funny on my Linux system) */
     item->set_text("Reset virtual machine");
 
-    MAPPER_AddHandler(RebootGuest, MK_b, MMODHOST, "reboot", "Reboot guest system", &item); /* Reboot guest system or integrated DOS */
+    MAPPER_AddHandler(RebootGuest, MK_b, MMODHOST, "reboot", "Reboot DOS system", &item); /* Reboot guest system or integrated DOS */
     item->set_text("Reboot guest system");
 
 #if !defined(HX_DOS)
@@ -7124,9 +7139,10 @@ bool GFX_IsFullscreen(void) {
     return sdl.desktop.fullscreen;
 }
 
+#if defined(WIN32) && !defined(HX_DOS) && !defined(C_SDL2) && defined(SDL_DOSBOX_X_SPECIAL)
 static bool CheckEnableImmOnKey(SDL_KeyboardEvent key)
 {
-	if(key.keysym.sym == 0 || key.keysym.sym == 0x08 || key.keysym.sym == 0x113 || key.keysym.sym == 0x114) {
+	if(key.keysym.sym == 0 || (!SDL_IM_Composition() && (key.keysym.sym == 0x08 || key.keysym.sym == 0x20 || key.keysym.sym == 0x113 || key.keysym.sym == 0x114))) {
 		// BS, <-, ->
 		return true;
 	}
@@ -7148,6 +7164,7 @@ static bool CheckEnableImmOnKey(SDL_KeyboardEvent key)
 	}
 	return false;
 }
+#endif
 
 bool sdl_wait_on_error() {
     return sdl.wait_on_error;
@@ -14287,6 +14304,7 @@ int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {
 #if C_DEBUG
         if (control->opt_display2) mainMenu.get_item("mapper_debugger").enable(false).refresh_item(mainMenu);
 #endif
+        mainMenu.get_item("mapper_speedlock2").check(ticksLocked).refresh_item(mainMenu);
 
         OutputSettingMenuUpdate();
         update_pc98_clock_pit_menu();
@@ -14482,7 +14500,7 @@ fresh_boot:
 
         if (dos_kernel_shutdown) {
 
-            if (!IS_PC98_ARCH&&dos.loaded_codepage!=437) dos.loaded_codepage=437;
+            if (!IS_PC98_ARCH&&!IS_JEGA_ARCH&&dos.loaded_codepage!=437) dos.loaded_codepage=437;
 
             /* NTS: we take different paths depending on whether we're just shutting down DOS
              *      or doing a hard reboot. */

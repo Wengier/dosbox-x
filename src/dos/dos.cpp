@@ -24,9 +24,12 @@
 #include <string.h>
 #include <assert.h>
 #include <ctype.h>
+#include <sys/stat.h>
+
 #include "dosbox.h"
 #include "dos_inc.h"
 #include "bios.h"
+#include "logging.h"
 #include "mem.h"
 #include "paging.h"
 #include "callback.h"
@@ -42,6 +45,7 @@
 #include "render.h"
 #include "jfont.h"
 #include "../ints/int10.h"
+#include "pic.h"
 #if defined(WIN32)
 #include "../dos/cdrom.h"
 #include <shellapi.h>
@@ -53,6 +57,7 @@
 
 static bool first_run=true;
 extern bool use_quick_reboot, enable_config_as_shell_commands;
+extern std::string log_dev_con_str;
 extern const char* RunningProgram;
 extern bool log_int21, log_fileio;
 extern bool sync_time, manualtime;
@@ -131,9 +136,9 @@ int maxfcb=100;
 int maxdrive=1;
 int enablelfn=-1;
 bool uselfn, winautorun=false;
-extern int infix;
-extern bool int15_wait_force_unmask_irq, shellrun, i4dos;
-extern bool winrun, startcmd, startwait, startquiet, ctrlbrk;
+extern int infix, log_dev_con;
+extern bool int15_wait_force_unmask_irq, shellrun, logging_con;
+extern bool winrun, startcmd, startwait, startquiet, ctrlbrk, i4dos;
 extern bool startup_state_numlock, mountwarning, clipboard_dosapi;
 std::string startincon;
 
@@ -3044,8 +3049,7 @@ void INT10_WriteChar_viaRealInt(uint8_t chr, uint8_t attr, uint8_t page, uint16_
 void INT10_ScrollWindow_viaRealInt(uint8_t rul, uint8_t cul, uint8_t rlr, uint8_t clr, int8_t nlines, uint8_t attr, uint8_t page);
 
 extern bool dos_con_use_int16_to_detect_input;
-extern bool dbg_zero_on_dos_allocmem;
-extern bool log_dev_con, addovl;
+extern bool dbg_zero_on_dos_allocmem, addovl;
 
 bool set_ver(char *s) {
 	s=trim(s);
@@ -3110,6 +3114,16 @@ static Bitu DOS_29Handler(void)
 	uint8_t col,row,page;
 	uint16_t ncols,nrows;
 	uint8_t tempdata;
+    if (log_dev_con) {
+        if (log_dev_con_str.size() >= 255 || reg_al == '\n' || reg_al == 27) {
+            logging_con = true;
+            LOG_MSG(log_dev_con==2?"%s":"DOS CON: %s",log_dev_con_str.c_str());
+            logging_con = false;
+            log_dev_con_str.clear();
+        }
+        if (reg_al != '\n' && reg_al != '\r')
+            log_dev_con_str += (char)reg_al;
+    }
 	if(!int29h_data.ansi.esc) {
 		if(reg_al == '\033') {
 			/*clear the datastructure */
@@ -3543,7 +3557,6 @@ public:
 		}
 
         dos_sda_size = section->Get_int("dos sda size");
-        log_dev_con = control->opt_log_con || section->Get_bool("log console");
 		enable_network_redirector = section->Get_bool("network redirector");
 		enable_dbcs_tables = section->Get_bool("dbcs");
 		enable_share_exe = section->Get_bool("share");
@@ -4210,7 +4223,7 @@ void DOS_Init() {
 
     DOSBoxMenu::item *item;
 
-    MAPPER_AddHandler(DOS_RescanAll,MK_nothing,0,"rescanall","Rescan all drives",&item);
+    MAPPER_AddHandler(DOS_RescanAll,MK_nothing,0,"rescanall","Rescan drives",&item);
     item->enable(false).refresh_item(mainMenu);
     item->set_text("Rescan all drives");
     for (char drv='A';drv <= 'Z';drv++) DOS_EnableDriveMenu(drv);
