@@ -2328,7 +2328,7 @@ public:
         case BB_Add: 
             mapper.addbind=true;
             SetActiveBind(0);
-            change_action_text("Press a key/joystick button or move the joystick.",CLR_RED);
+            change_action_text(MSG_Get("PRESS_JOYSTICK_KEY"),CLR_RED);
             break;
         case BB_Del:
             assert(mapper.aevent != NULL);
@@ -2368,7 +2368,7 @@ public:
             break;
         case BB_Capture:
             GFX_CaptureMouse();
-            if (mouselocked) change_action_text("Capture enabled. Hit ESC to release capture.",CLR_WHITE);
+            if (mouselocked) change_action_text(MSG_Get("CAPTURE_ENABLED"),CLR_WHITE);
             break;
         }
     }
@@ -3520,9 +3520,8 @@ static void CreateLayout(void) {
     AddKeyButtonEvent(PX(14),PY(5),BW*2,BH,"CTRL","rctrl",KBD_rightctrl);
 
     /* Arrow Keys */
-#define XO 18
+#define XO 19
 #define YO 0
-
     AddKeyButtonEvent(PX(XO+0),PY(YO),BW,BH,"PRT","printscreen",KBD_printscreen);
     AddKeyButtonEvent(PX(XO+1),PY(YO),BW,BH,"SCL","scrolllock",KBD_scrolllock);
     AddKeyButtonEvent(PX(XO+2),PY(YO),BW,BH,"PAU","pause",KBD_pause);
@@ -3532,14 +3531,12 @@ static void CreateLayout(void) {
     AddKeyButtonEvent(PX(XO+0),PY(YO+2),BW,BH,"DEL","delete",KBD_delete);
     AddKeyButtonEvent(PX(XO+1),PY(YO+2),BW,BH,"END","end",KBD_end);
     AddKeyButtonEvent(PX(XO+2),PY(YO+2),BW,BH,"PDN","pagedown",KBD_pagedown);
-    AddKeyButtonEvent(PX(XO-4),PY(YO),BW,BH,"NEQ","kp_equals",KBD_kpequals);
+    AddKeyButtonEvent(PX(XO-2),PY(YO+3),BW,BH,"NEQ","kp_equals",KBD_kpequals);
     AddKeyButtonEvent(PX(XO-2),PY(YO),BW,BH,"\x18 U","up",KBD_up);
     AddKeyButtonEvent(PX(XO-3),PY(YO+1),BW,BH,"\x1B L","left",KBD_left);
     AddKeyButtonEvent(PX(XO-2),PY(YO+1),BW,BH,"\x19 D","down",KBD_down);
     AddKeyButtonEvent(PX(XO-1),PY(YO+1),BW,BH,"\x1A R","right",KBD_right);
-#undef XO
 #undef YO
-#define XO 18
 #define YO 5
 	/* Mouse Buttons */
 	new CTextButton(PX(XO+0),PY(YO-1),3*BW,20,"Mouse keys");
@@ -3743,7 +3740,7 @@ static void CreateLayout(void) {
         if ((xpos+columns-1)>6) {
             xpos=3;ypos++;
         }
-        CEventButton *button=new CEventButton(PX(xpos*3),PY(ypos),BW*3*columns,BH,(*hit)->ButtonName(),(*hit));
+        CEventButton *button=new CEventButton(PX(xpos*3)+(xpos==5?BW/2:0),PY(ypos),BW*3*columns+BW/2,BH,(*hit)->ButtonName(),(*hit));
         ceventbuttons.push_back(button);
         (*hit)->notifybutton(button);
         button->Enable(page==cpage);
@@ -3758,7 +3755,7 @@ static void CreateLayout(void) {
         }
     }
     bind_but.prevpage=new CBindButton(280,388,130,BH,MSG_Get("PREVIOUS_PAGE"),BB_Prevpage);
-    bind_but.nextpage=new CBindButton(470,388,100,BH,MSG_Get("NEXT_PAGE"),BB_Nextpage);
+    bind_but.nextpage=new CBindButton(470,388,130,BH,MSG_Get("NEXT_PAGE"),BB_Nextpage);
     bind_but.pagestat=new CCaptionButton(418,388,462-418,BH);
     bind_but.pagestat->Change("%2u/%-2u",cpage,maxpage);
     if (cpage==1) bind_but.prevpage->SetColor(CLR_GREY);
@@ -3786,14 +3783,14 @@ static void CreateLayout(void) {
     bind_but.del=new CBindButton(70,384,50,BH,MSG_Get("DEL"),BB_Del);
     bind_but.next=new CBindButton(120,384,50,BH,MSG_Get("NEXT"),BB_Next);
 
-    bind_but.save=new CBindButton(180,444,50,BH,MSG_Get("SAVE"),BB_Save);
-    bind_but.exit=new CBindButton(230,444,50,BH,MSG_Get("EXIT"),BB_Exit);
-    bind_but.cap=new CBindButton(280,444,50,BH,MSG_Get("CAPT"),BB_Capture);
+    bind_but.save=new CBindButton(180,444,60,BH,MSG_Get("SAVE"),BB_Save);
+    bind_but.exit=new CBindButton(240,444,60,BH,MSG_Get("EXIT"),BB_Exit);
+    bind_but.cap=new CBindButton(300,444,85,BH,MSG_Get("CAPTURE"),BB_Capture);
 
     bind_but.dbg = new CCaptionButton(180, 462, 460, 20); // right below the Save button
     bind_but.dbg->Change("(event debug)");
 
-    bind_but.dbg2 = new CCaptionButton(330, 444, 310, 20); // right next to the Save button
+    bind_but.dbg2 = new CCaptionButton(390, 444, 310, 20); // right next to the Save button
     bind_but.dbg2->Change("%s", "");
 
     bind_but.bind_title->Change("Bind Title");
@@ -4634,6 +4631,20 @@ void MAPPER_RunInternal() {
     MAPPER_ReleaseAllKeys();
 
 #ifdef DOSBOXMENU_EXTERNALLY_MANAGED
+    {
+        DOSBoxMenu::item &item = mapperMenu.get_item("MapperMenu");
+        item.set_text(mainMenu.get_item("mapper_mapper").get_text());
+    }
+
+    {
+        DOSBoxMenu::item &item = mapperMenu.get_item("ExitMapper");
+        item.set_text(MSG_Get("MAPPER_EDITOR_EXIT"));
+    }
+
+    {
+        DOSBoxMenu::item &item = mapperMenu.get_item("SaveMapper");
+        item.set_text(MSG_Get("SAVE_MAPPER_FILE"));
+    }
     mapperMenu.rebuild();
 #endif
 
@@ -5083,19 +5094,19 @@ void MAPPER_StartUp() {
 
     {
         DOSBoxMenu::item &item = mapperMenu.alloc_item(DOSBoxMenu::submenu_type_id,"MapperMenu");
-        item.set_text("Mapper");
+        item.set_text(mainMenu.get_item("mapper_mapper").get_text());
     }
 
     {
         DOSBoxMenu::item &item = mapperMenu.alloc_item(DOSBoxMenu::item_type_id,"ExitMapper");
         item.set_callback_function(mapper_menu_exit);
-        item.set_text("Exit mapper");
+        item.set_text(MSG_Get("MAPPER_EDITOR_EXIT"));
     }
 
     {
         DOSBoxMenu::item &item = mapperMenu.alloc_item(DOSBoxMenu::item_type_id,"SaveMapper");
         item.set_callback_function(mapper_menu_save);
-        item.set_text("Save mapper file");
+        item.set_text(MSG_Get("SAVE_MAPPER_FILE"));
     }
 
     mapperMenu.displaylist_clear(mapperMenu.display_list);
@@ -5222,7 +5233,7 @@ void update_bindbutton_text() {
     if (bind_but.next) bind_but.next->SetText(MSG_Get("NEXT"));
     if (bind_but.save) bind_but.save->SetText(MSG_Get("SAVE"));
     if (bind_but.exit) bind_but.exit->SetText(MSG_Get("EXIT"));
-    if (bind_but.cap) bind_but.cap->SetText(MSG_Get("CAPT"));
+    if (bind_but.cap) bind_but.cap->SetText(MSG_Get("CAPTURE"));
 }
 
 void set_eventbutton_text(const char *eventname, const char *buttonname) {

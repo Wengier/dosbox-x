@@ -20,6 +20,12 @@ DOSBox-X Configuration Tool
 :CONFIG_TOOL_EXIT
 Exit configuration tool
 .
+:MAPPER_EDITOR_EXIT
+Exit mapper editor
+.
+:SAVE_MAPPER_FILE
+Save mapper file
+.
 :WARNING
 Warning
 .
@@ -47,14 +53,14 @@ Del
 :NEXT
 Next
 .
-:CAPT
-Capt
+:SAVE
+Save
 .
 :EXIT
 Exit
 .
-:SAVE
-Save
+:CAPTURE
+Capture
 .
 :SAVE_CONFIGURATION
 Save configuration
@@ -95,9 +101,6 @@ Configuration
 :SETTINGS
 Settings
 .
-:HELP
-Help
-.
 :VISIT_HOMEPAGE
 Visit Homepage
 .
@@ -137,14 +140,8 @@ Network interface list
 :PRINTER_LIST
 Printer device list
 .
-:INTRODUCTION_TO
-Introduction to DOSBox-X
-.
 :INTRODUCTION
 Introduction
-.
-:ABOUT
-About
 .
 :CONFIGURE_GROUP
 Choose a settings group to configure:
@@ -207,13 +204,19 @@ Slot
 < Previous Page
 .
 :NEXT_PAGE
- Next Page >
+    Next Page >
 .
 :SELECT_EVENT
 Select an event to change.
 .
 :SELECT_DIFFERENT_EVENT
 Select a different event or hit the Add/Del/Next buttons.
+.
+:PRESS_JOYSTICK_KEY
+Press a key/joystick button or move the joystick.
+.
+:CAPTURE_ENABLED
+Capture enabled. Hit ESC to release capture.
 .
 :MAPPER_FILE_SAVED
 Mapper file saved

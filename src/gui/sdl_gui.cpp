@@ -118,7 +118,7 @@ void                        WindowsTaskbarResetPreviewRegion(void);
 void                        macosx_reload_touchbar(void);
 #endif
 
-char tmp1[CROSS_LEN], tmp2[CROSS_LEN];
+char tmp1[CROSS_LEN*2], tmp2[CROSS_LEN];
 const char *aboutmsg = "DOSBox-X version " VERSION " (" SDL_STRING ", "
 #if defined(_M_X64) || defined (_M_AMD64) || defined (_M_ARM64) || defined (_M_IA64) || defined(__ia64__) || defined(__LP64__) || defined(_WIN64) || defined(__x86_64__) || defined(__aarch64__) || defined(__powerpc64__)
 	"64"
@@ -1003,7 +1003,7 @@ public:
         setTitle(tmp1);
         title[0] = std::toupper(title[0]);
 
-        GUI::Button *b = new GUI::Button(this, button_row_cx, button_row_y, MSG_Get("HELP"), button_w);
+        GUI::Button *b = new GUI::Button(this, button_row_cx, button_row_y, mainMenu.get_item("HelpMenu").get_text().c_str(), button_w);
         b->addActionHandler(this);
 
         b = new GUI::Button(this, button_row_cx + (button_w + button_pad_w)*2, button_row_y, MSG_Get("CANCEL"), button_w);
@@ -1081,8 +1081,9 @@ public:
     }
 
     void actionExecuted(GUI::ActionEventSource *b, const GUI::String &arg) {
+        strcpy(tmp1, mainMenu.get_item("HelpMenu").get_text().c_str());
         if (arg == MSG_Get("OK") || arg == MSG_Get("CANCEL") || arg == MSG_Get("CLOSE")) { close(); if(shortcut) running=false; }
-        else if (arg == MSG_Get("HELP")) {
+        else if (arg == tmp1) {
             std::vector<GUI::Char> new_cfg_sname;
 
             if (!cfg_sname.empty()) {
@@ -2575,7 +2576,7 @@ public:
         bar->addItem(0,"");
         bar->addItem(0,MSG_Get("CLOSE"));
         bar->addMenu(MSG_Get("SETTINGS"));
-        bar->addMenu(MSG_Get("HELP"));
+        bar->addMenu(mainMenu.get_item("HelpMenu").get_text().c_str());
         bar->addItem(2,MSG_Get("VISIT_HOMEPAGE"));
         bar->addItem(2,"");
         if (!dos_kernel_disabled) {
@@ -2585,7 +2586,7 @@ public:
             bar->addItem(2,"");
         }
         bar->addItem(2,MSG_Get("INTRODUCTION"));
-        bar->addItem(2,MSG_Get("ABOUT"));
+        bar->addItem(2,mainMenu.get_item("help_about").get_text().c_str());
         bar->addActionHandler(this);
 
         new GUI::Label(this, 10, 30, MSG_Get("CONFIGURE_GROUP"));
@@ -2653,8 +2654,8 @@ public:
         GUI::String sname = RestoreName(arg);
         sname.at(0) = (unsigned int)std::tolower((int)sname.at(0));
         Section *sec;
-        strcpy(tmp1, (MSG_Get("SAVE")+std::string("...")).c_str());
-        strcpy(tmp2, (MSG_Get("SAVE_LANGUAGE")+std::string("...")).c_str());
+        strcpy(tmp1, mainMenu.get_item("help_about").get_text().c_str());
+        strcpy(tmp2, (MSG_Get("SAVE")+std::string("...")).c_str());
         if (arg == MSG_Get("OK") || arg == MSG_Get("CANCEL") || arg == MSG_Get("CLOSE")) {
             running = false;
         } else if (sname == "autoexec") {
@@ -2702,12 +2703,12 @@ public:
 #elif defined(MACOSX)
             system(("open "+url).c_str());
 #endif
-        } else if (arg == MSG_Get("ABOUT")) {
+        } else if (arg == tmp1) {
             //new GUI::MessageBox2(getScreen(), 100, 150, 330, "About DOSBox-X", aboutmsg);
-            new GUI::MessageBox2(getScreen(), getScreen()->getWidth()>330?(parent->getWidth()-330)/2:0, 150, 340, (MSG_Get("ABOUT")+std::string(" DOSBox-X")).c_str(), aboutmsg);
+            new GUI::MessageBox2(getScreen(), getScreen()->getWidth()>330?(parent->getWidth()-330)/2:0, 150, 340, mainMenu.get_item("help_about").get_text().c_str(), aboutmsg);
         } else if (arg == MSG_Get("INTRODUCTION")) {
             //new GUI::MessageBox2(getScreen(), 20, 50, 540, "Introduction", intromsg);
-            new GUI::MessageBox2(getScreen(), getScreen()->getWidth()>540?(parent->getWidth()-540)/2:0, 50, 540, MSG_Get("INTRODUCTION"), MSG_Get("INTRO_MESSAGE"));
+            new GUI::MessageBox2(getScreen(), getScreen()->getWidth()>540?(parent->getWidth()-540)/2:0, 50, 540, mainMenu.get_item("help_intro").get_text().c_str(), MSG_Get("INTRO_MESSAGE"));
         } else if (arg == MSG_Get("GET_STARTED")) {
             std::string msg = MSG_Get("PROGRAM_INTRO_MOUNT_START");
 #ifdef WIN32
@@ -2722,15 +2723,17 @@ public:
         } else if (arg == MSG_Get("CDROM_SUPPORT")) {
             //new GUI::MessageBox2(getScreen(), 20, 50, 640, "CD-ROM Support", MSG_Get("PROGRAM_INTRO_CDROM"));
             new GUI::MessageBox2(getScreen(), getScreen()->getWidth()>640?(parent->getWidth()-640)/2:0, 50, 640, MSG_Get("CDROM_SUPPORT"), MSG_Get("PROGRAM_INTRO_CDROM"));
-        } else if (arg == tmp1) {
+        } else if (arg == tmp2) {
             strcpy(tmp1, (MSG_Get("SAVE_CONFIGURATION")+std::string("...")).c_str());
             auto *np = new SaveDialog(getScreen(), 50, 100, tmp1);
             np->raise();
-        } else if (arg == tmp2) {
-            auto *np = new SaveLangDialog(getScreen(), 90, 100, tmp2);
-            np->raise();
         } else {
-            return ToplevelWindow::actionExecuted(b, arg);
+            strcpy(tmp2, (MSG_Get("SAVE_LANGUAGE")+std::string("...")).c_str());
+            if (arg == tmp2) {
+                auto *np = new SaveLangDialog(getScreen(), 90, 100, tmp2);
+                np->raise();
+            } else
+                return ToplevelWindow::actionExecuted(b, arg);
         }
     }
 };
@@ -2956,11 +2959,11 @@ static void UI_Select(GUI::ScreenSDL *screen, int select) {
             np10->raise();
             } break;
         case 34: {
-            auto *np11 = new ShowHelpIntro(screen, 70, 70, MSG_Get("INTRODUCTION_TO"));
+            auto *np11 = new ShowHelpIntro(screen, 70, 70, mainMenu.get_item("help_intro").get_text().c_str());
             np11->raise();
             } break;
         case 35: {
-            auto *np12 = new ShowHelpAbout(screen, 110, 70, (MSG_Get("ABOUT")+std::string(" DOSBox-X")).c_str());
+            auto *np12 = new ShowHelpAbout(screen, 110, 70, mainMenu.get_item("help_about").get_text().c_str());
             np12->raise();
             } break;
         case 36: {

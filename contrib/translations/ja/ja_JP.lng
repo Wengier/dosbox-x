@@ -25,6 +25,12 @@ DOSBox-X 設定ツール
 :CONFIG_TOOL_EXIT
 設定ツールを終了する
 .
+:MAPPER_EDITOR_EXIT
+マッパーエディター終了する
+.
+:SAVE_MAPPER_FILE
+マッパーファイルを保存
+.
 :WARNING
 注意
 .
@@ -37,26 +43,29 @@ DOSBox-X 設定ツール
 :OK
 OK
 .
-:ADD
-Add
-.
-:DEL
-Del
-.
-:NEXT
-Next
-.
-:CAPT
-Capt
-.
 :CANCEL
 キャンセル
 .
 :CLOSE
 閉じる
 .
+:ADD
+追加
+.
+:DEL
+削除
+.
+:NEXT
+次
+.
 :SAVE
 保存
+.
+:EXIT
+終了
+.
+:CAPTURE
+キャプチャ
 .
 :SAVE_CONFIGURATION
 設定を保存
@@ -97,9 +106,6 @@ Capt
 :SETTINGS
 設定
 .
-:HELP
-ヘルプ
-.
 :VISIT_HOMEPAGE
 ホームページ
 .
@@ -110,43 +116,37 @@ Capt
 CD-ROM サポート
 .
 :DRIVE_INFORMATION
-Drive information
+ドライブ情報
 .
 :MOUNTED_DRIVE_NUMBER
-Mounted drive numbers
+マウントされたドライブ数
 .
 :IDE_CONTROLLER_ASSIGNMENT
-IDE controller assignment
+IDE コントローラ接続状態
 .
 :HELP_COMMAND
-Help on DOS command
+DOS コマンドのヘルプ
 .
 :CURRENT_VOLUME
-Current sound mixer volumes
+現在の音量ミキサの設定
 .
 :CURRENT_SBCONFIG
-Sound Blaster configuration
+現在の Sound Blaster 設定
 .
 :CURRENT_MIDICONFIG
-Current MIDI configuration
+現在の MIDI 設定
 .
 :CREATE_IMAGE
-Create blank disk image
+空のディスクイメージ作成
 .
 :NETWORK_LIST
-Network interface list
+ネットワークインターフェース一覧
 .
 :PRINTER_LIST
-Printer device list
-.
-:INTRODUCTION_TO
-Introduction to DOSBox-X
+プリンタデバイス一覧
 .
 :INTRODUCTION
 紹介
-.
-:ABOUT
-DOSBox-Xについて
 .
 :CONFIGURE_GROUP
 設定するグループを選択:
@@ -208,19 +208,25 @@ IDE ポジション
 スロット
 .
 :PREVIOUS_PAGE
-< Previous Page
+< 前のページ
 .
 :NEXT_PAGE
- Next Page >
+   次のページ >
 .
 :SELECT_EVENT
-Select an event to change.
+設定変更するイベントを選択
 .
 :SELECT_DIFFERENT_EVENT
-Select a different event or hit the Add/Del/Next buttons.
+イベントを選択または、追加/削除/次ボタンを押してください
+.
+:PRESS_JOYSTICK_KEY
+キー/ボタンを押すか、ジョイスティックを動かします
+.
+:CAPTURE_ENABLED
+キャプチャしています。ESCで終了します。
 .
 :MAPPER_FILE_SAVED
-Mapper file saved
+マッバーファイルを保存しました
 .
 :AUTO_CYCLE_MAX
 自動サイクル設定 [最大]
@@ -2124,7 +2130,7 @@ DOSBox-X コマンド・シェルの起動
 DOSBox-Xを終了する
 .
 :MENU:mapper_capmouse
-マウスをキャプチャする
+マウスをキャプチャ
 .
 :MENU:mapper_fastedit
 クイック編集: 選択時コピーとテキスト貼付け
@@ -2154,16 +2160,16 @@ DOS画面上のテキストをすべてコピー
 全画面表示との切替
 .
 :MENU:mapper_resetsize
-ウィンドウサイズのリセット
+ウィンドウサイズ初期化
 .
 :MENU:mapper_incsize
-TTFフォントサイズ 大きくする
+TTFフォントサイズ: 拡大
 .
 :MENU:mapper_decsize
-TTFフォントサイズ 小さくする
+TTFフォントサイズ: 縮小
 .
 :MENU:mapper_togmenu
-メニューバーの表示・非表示
+メニューバー表示切替
 .
 :MENU:MainMenu
 メイン
@@ -3045,7 +3051,7 @@ FM (OPL) 出力を保存
 動画をAVIに保存
 .
 :MENU:mapper_scrshot
-スクリーンショットを撮る
+スクリーンショット
 .
 :MENU:mapper_debugger
 DOSBox-X デバッガの起動
@@ -3138,7 +3144,7 @@ Pentium Pro
 デバッグ用ライン表示 (CRTCステータス読取り)
 .
 :MENU:mapper_swapimg
-フロッピードライブを入替
+フロッピーを入替
 .
 :MENU:mapper_swapcd
 CD ドライブを入替
@@ -3288,80 +3294,80 @@ DOS テキスト画面を印刷
 USキーボードレイアウトを使用
 .
 :MAPPER:caprawopl
-Record FM/OPL output
+FM/OPL 出力を保存
 .
 :MAPPER:copyall
-Copy to clipboard
+クリップボードにコピー
 .
 :MAPPER:cycauto
-Toggle auto cycles
+サイクル自動設定 切替
 .
 :MAPPER:debugger
-Show debugger
+デバッガーを表示
 .
 :MAPPER:decsize
-Decrease TTF size
+TTF サイズ: 縮小
 .
 :MAPPER:dynamic
-CPU: dynamic core
+CPU:ダイナミックコア
 .
 :MAPPER:fastedit
-Quick edit mode
+クイック編集モード
 .
 :MAPPER:full
-CPU: full core
+CPU:完全コア
 .
 :MAPPER:incsize
-Increase TTF size
+TTF サイズ: 拡大
 .
 :MAPPER:loadmap
-Load mapper file
+マッパーファイル読込
 .
 :MAPPER:nextslot
-Next save slot
+次のセーブスロット
 .
 :MAPPER:normal
-CPU: normal core
+CPU:標準コア
 .
 :MAPPER:paste
-Paste from clipboard
+クリップボードを貼付
 .
 :MAPPER:pasteend
-Stop clipboard paste
+クリップボード停止
 .
 :MAPPER:pauseints
-Pause with interrupt
+一時停止(割込有効)
 .
 :MAPPER:prevslot
-Previous save slot
+前のセーブスロット
 .
 :MAPPER:quickrun
-Quick launch program
+クイック起動
 .
 :MAPPER:recmtwave
-Record to M.T. AVI
+M.T. AVI形式で保存
 .
 :MAPPER:reboot
-Reboot DOS system
+DOSシステムの再起動
 .
 :MAPPER:recvoldown
-Decrease rec. volume
+録音レベル: 下
 .
 :MAPPER:recvolup
-Increase rec. volume
+録音レベル: 上
 .
 :MAPPER:rescanall
-Rescan drives
+ドライブを再スキャン
 .
 :MAPPER:reset
-Reset DOSBox-X
+DOSBox-Xを再起動
 .
 :MAPPER:showstate
-Display state info
+ステートの情報表示
 .
 :MAPPER:simple
-CPU: simple core
+CPU:簡易コア
 .
 :MAPPER:togmenu
-Toggle menu bar
+メニューバー表示切替
 .

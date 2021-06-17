@@ -4420,6 +4420,8 @@ void DOSBOX_SetupConfigSections(void) {
     MSG_Add("CONFIG_ADVANCED_OPTION", "Advanced options (see full configuration reference file [dosbox-x.reference.full.conf] for more details)");
     MSG_Add("CONFIG_TOOL","DOSBox-X Configuration Tool");
     MSG_Add("CONFIG_TOOL_EXIT","Exit configuration tool");
+    MSG_Add("MAPPER_EDITOR_EXIT","Exit mapper editor");
+    MSG_Add("SAVE_MAPPER_FILE","Save mapper file");
     MSG_Add("WARNING","Warning");
     MSG_Add("YES","Yes");
     MSG_Add("NO","No");
@@ -4429,9 +4431,9 @@ void DOSBOX_SetupConfigSections(void) {
     MSG_Add("ADD","Add");
     MSG_Add("DEL","Del");
     MSG_Add("NEXT","Next");
-    MSG_Add("CAPT","Capt");
-    MSG_Add("EXIT","Exit");
     MSG_Add("SAVE","Save");
+    MSG_Add("EXIT","Exit");
+    MSG_Add("CAPTURE","Capture");
     MSG_Add("SAVE_CONFIGURATION","Save configuration");
     MSG_Add("SAVE_LANGUAGE","Save language file");
     MSG_Add("SAVE_RESTART","Save & Restart");
@@ -4445,7 +4447,6 @@ void DOSBOX_SetupConfigSections(void) {
     MSG_Add("CONFIGURATION_FOR","Configuration for %s");
     MSG_Add("CONFIGURATION","Configuration");
     MSG_Add("SETTINGS","Settings");
-    MSG_Add("HELP","Help");
     MSG_Add("VISIT_HOMEPAGE","Visit Homepage");
     MSG_Add("GET_STARTED","Getting Started");
     MSG_Add("CDROM_SUPPORT","CD-ROM Support");
@@ -4459,9 +4460,7 @@ void DOSBOX_SetupConfigSections(void) {
     MSG_Add("CREATE_IMAGE","Create blank disk image");
     MSG_Add("NETWORK_LIST","Network interface list");
     MSG_Add("PRINTER_LIST","Printer device list");
-    MSG_Add("INTRODUCTION_TO","Introduction to DOSBox-X");
     MSG_Add("INTRODUCTION","Introduction");
-    MSG_Add("ABOUT","About");
     MSG_Add("CONFIGURE_GROUP", "Choose a settings group to configure:");
     MSG_Add("SHOW_ADVOPT", "Show advanced options");
     MSG_Add("USE_PRIMARYCONFIG", "Use primary config file");
@@ -4482,9 +4481,11 @@ void DOSBOX_SetupConfigSections(void) {
     MSG_Add("EMPTY_SLOT","Empty slot");
     MSG_Add("SLOT","Slot");
     MSG_Add("PREVIOUS_PAGE","< Previous Page");
-    MSG_Add("NEXT_PAGE"," Next Page >");
+    MSG_Add("NEXT_PAGE","    Next Page >");
     MSG_Add("SELECT_EVENT", "Select an event to change.");
     MSG_Add("SELECT_DIFFERENT_EVENT", "Select a different event or hit the Add/Del/Next buttons.");
+    MSG_Add("PRESS_JOYSTICK_KEY", "Press a key/joystick button or move the joystick.");
+    MSG_Add("CAPTURE_ENABLED", "Capture enabled. Hit ESC to release capture.");
     MSG_Add("MAPPER_FILE_SAVED", "Mapper file saved");
     MSG_Add("AUTO_CYCLE_MAX","Auto cycles [max]");
     MSG_Add("AUTO_CYCLE_AUTO","Auto cycles [auto]");
