@@ -31,7 +31,7 @@
 #include "dos_inc.h"
 #define INCJFONT 1
 #include "jfont.h"
-#if defined(LINUX)
+#if defined(LINUX) && C_X11
 #include <X11/Xlib.h>
 #include <X11/Xlocale.h>
 #include <X11/Xutil.h>
@@ -47,7 +47,7 @@
 #define DBCS24_LEN 65536 * 72
 #define SBCS24_LEN 256 * 48
 
-#if defined(LINUX)
+#if defined(LINUX) && C_X11
 static Display *font_display;
 static Window font_window;
 static Pixmap font_pixmap;
@@ -94,6 +94,7 @@ static HFONT jfont_16;
 static HFONT jfont_24;
 #endif
 
+bool gbk = false;
 bool nokanji = false;
 bool yen_flag = false;
 bool jfont_init = false;
@@ -109,7 +110,7 @@ extern uint8_t lead[6];
 bool isKanji1(uint8_t chr) {
     if (nokanji) return false;
     else if (dos.loaded_codepage == 936 || IS_PDOSV)
-        return (chr >= 0xa1 && chr <= 0xfe);
+        return (chr >= (gbk?0x81:0xa1) && chr <= 0xfe);
     else if (dos.loaded_codepage == 949 || dos.loaded_codepage == 950 || IS_CDOSV || IS_KDOSV)
         return (chr >= 0x81 && chr <= 0xfe);
     else
@@ -265,7 +266,7 @@ static bool CheckEmptyData(uint8_t *data, Bitu length)
 
 bool GetWindowsFont(Bitu code, uint8_t *buff, int width, int height)
 {
-#if defined(LINUX) && !defined(C_SDL2) // Confirmed to work on Linux SDL1 build; seems to not work on Linux SDL2 build
+#if defined(LINUX) && C_X11 && !defined(C_SDL2) // Confirmed to work on Linux SDL1 build; seems to not work on Linux SDL2 build
 	XRectangle ir, lr;
 	wchar_t text[4];
 
@@ -556,7 +557,7 @@ uint8_t *GetSbcs24Font(Bitu code)
 
 void InitFontHandle()
 {
-#if defined(LINUX)
+#if defined(LINUX) && C_X11
 	int missing_count;
 	char **missing_list;
 	char *def_string;
@@ -603,7 +604,7 @@ bool MakeSbcs16Font() {
 		if(!GetWindowsFont(code, &jfont_sbcs_16[code * 16], 8, 16))
 			return false;
 	}
-	if (IS_JDOSV) memcpy(jfont_sbcs_16, dosv_font16_data, sizeof(dosv_font16_data));
+	if (IS_JDOSV||IS_JEGA_ARCH) memcpy(jfont_sbcs_16, dosv_font16_data, sizeof(dosv_font16_data));
 	else if (IS_DOSV) for(Bitu ct = 0 ; ct < 0x100 ; ct++) memcpy(&jfont_sbcs_16[ct * 16], &int10_font_16[ct * 16], 16);
 	return true;
 }
@@ -618,7 +619,7 @@ bool MakeSbcs19Font() {
 		}
 	}
 	if (fail) memcpy(jfont_sbcs_19, JPNHN19X+NAME_LEN+ID_LEN+3, SBCS19_LEN);
-	if (IS_JDOSV) memcpy(jfont_sbcs_19, dosv_font19_data, sizeof(dosv_font19_data));
+	if (IS_JDOSV||IS_JEGA_ARCH) memcpy(jfont_sbcs_19, dosv_font19_data, sizeof(dosv_font19_data));
 	else if (IS_DOSV) for(Bitu ct = 0 ; ct < 0x100 ; ct++) memcpy(&jfont_sbcs_19[ct * 19 + 1], &int10_font_16[ct * 16], 16);
 	return true;
 }
@@ -629,7 +630,7 @@ bool MakeSbcs24Font() {
 		if(!GetWindowsFont(code, &jfont_sbcs_24[code * 24 * 2], 12, 24))
 			return false;
 	}
-	if (IS_JDOSV) memcpy(jfont_sbcs_24, dosv_font24_data, sizeof(dosv_font24_data));
+	if (IS_JDOSV||IS_JEGA_ARCH) memcpy(jfont_sbcs_24, dosv_font24_data, sizeof(dosv_font24_data));
 	else if (IS_DOSV) for(Bitu ct = 0 ; ct < 0x100 ; ct++) memcpy(&jfont_sbcs_24[ct * 24], &int10_font_16[ct * 16], 16);
 	return true;
 }
@@ -639,10 +640,10 @@ void JFONT_Init() {
 #if defined(WIN32) && !defined(HX_DOS) && !defined(C_SDL2) && defined(SDL_DOSBOX_X_SPECIAL)
 	SDL_SetCompositionFontName(jfont_name);
 #endif
-    Section_prop *section = static_cast<Section_prop *>(control->GetSection("render"));
+    Section_prop *section = static_cast<Section_prop *>(control->GetSection("dosv"));
 	yen_flag = section->Get_bool("yen");
 
-	Prop_path* pathprop = section->Get_path("jfontsbcs");
+	Prop_path* pathprop = section->Get_path("fontxsbcs");
 	if (pathprop) {
 		std::string path=pathprop->realpath;
 		ResolvePath(path);
@@ -654,7 +655,7 @@ void JFONT_Init() {
 					memcpy(&jfont_sbcs_19[ct * 19 + 1], &int10_font_16[ct * 16], 16);
 #endif
 			}
-		} else if(yen_flag) {
+		} else if(yen_flag && !(IS_DOSV && !IS_JDOSV)) {
 			if(!CheckEmptyData(&jfont_sbcs_19[0x7f * 19], 19))
 				memcpy(&jfont_sbcs_19[0x5c * 19], &jfont_sbcs_19[0x7f * 19], 19);
 		}
@@ -662,20 +663,20 @@ void JFONT_Init() {
 		if(!MakeSbcs19Font())
 			LOG_MSG("MSG: SBCS 8x19 font file path is not specified.\n");
 	}
-	pathprop = section->Get_path("jfontdbcs");
+	pathprop = section->Get_path("fontxdbcs");
 	if(pathprop) {
 		std::string path=pathprop->realpath;
 		ResolvePath(path);
 		LoadFontxFile(path.c_str());
 	}
-	pathprop = section->Get_path("jfontdbcs14");
+	pathprop = section->Get_path("fontxdbcs14");
 	if(pathprop) {
 		std::string path=pathprop->realpath;
 		ResolvePath(path);
 		LoadFontxFile(path.c_str(), 14);
 	}
 	if(IS_DOSV) {
-		pathprop = section->Get_path("jfontsbcs16");
+		pathprop = section->Get_path("fontxsbcs16");
 		if(pathprop) {
 			std::string path=pathprop->realpath;
 			ResolvePath(path);
@@ -686,7 +687,7 @@ void JFONT_Init() {
 					memcpy(jfont_sbcs_16, int10_font_16, 256 * 16);
 #endif
 				}
-			} else if(yen_flag) {
+			} else if(yen_flag && !(IS_DOSV && !IS_JDOSV)) {
 				if(!CheckEmptyData(&jfont_sbcs_16[0x7f * 16], 16))
 					memcpy(&jfont_sbcs_16[0x5c * 16], &jfont_sbcs_16[0x7f * 16], 16);
 			}
@@ -695,13 +696,13 @@ void JFONT_Init() {
 				LOG_MSG("MSG: SBCS 8x16 font file path is not specified.\n");
 			}
 		}
-		pathprop = section->Get_path("jfontdbcs24");
+		pathprop = section->Get_path("fontxdbcs24");
 		if(pathprop) {
 			std::string path=pathprop->realpath;
 			ResolvePath(path);
 			LoadFontxFile(path.c_str());
 		}
-		pathprop = section->Get_path("jfontsbcs24");
+		pathprop = section->Get_path("fontxsbcs24");
 		if(pathprop) {
 			std::string path=pathprop->realpath;
 			ResolvePath(path);
@@ -709,7 +710,7 @@ void JFONT_Init() {
 				if(!MakeSbcs24Font()) {
 					LOG_MSG("MSG: SBCS 12x24 font file path is not specified.\n");
 				}
-			} else if(yen_flag) {
+			} else if(yen_flag && !(IS_DOSV && !IS_JDOSV)) {
 				if(!CheckEmptyData(&jfont_sbcs_24[0x7f * 2 * 24], 2 * 24))
 					memcpy(&jfont_sbcs_24[0x5c * 2 * 24], &jfont_sbcs_24[0x7f * 2 * 24], 2 * 24);
 			}

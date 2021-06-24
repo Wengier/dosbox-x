@@ -65,7 +65,9 @@ extern bool use_quick_reboot;
 extern bool force_load_state;
 extern bool force_conversion;
 extern bool pc98_force_ibm_layout;
-extern bool enable_config_as_shell_commands;
+extern bool ttfswitch, switch_output_from_ttf;
+extern bool inshell, enable_config_as_shell_commands;
+bool tooutttf = false;
 bool dos_kernel_disabled = true;
 bool winrun=false, use_save_file=false;
 bool usesystemcursor = false, enableime = false;
@@ -103,6 +105,7 @@ void GFX_OpenGLRedrawScreen(void), InitFontHandle();
 # endif
 #endif
 
+#include "control.h"
 #include "dosbox.h"
 #include "menudef.h"
 #include "pic.h"
@@ -271,7 +274,7 @@ extern bool has_touch_bar_support;
 bool macosx_detect_nstouchbar(void);
 void macosx_init_touchbar(void);
 void macosx_GetWindowDPI(ScreenSizeInfo &info);
-bool macosx_yesno(const char *title, const char *message);
+int macosx_yesno(const char *title, const char *message);
 int macosx_yesnocancel(const char *title, const char *message);
 std::string macosx_prompt_folder(const char *default_folder);
 void GetClipboard(std::string* result);
@@ -1118,6 +1121,15 @@ void KeyboardLayoutDetect(void) {
     LOG_MSG("Host keyboard layout is now %s (%s)",
         DKM_to_string(host_keyboard_layout),
         DKM_to_descriptive_string(host_keyboard_layout));
+
+    if (IS_PC98_ARCH) {
+        Section_prop * pc98_section = static_cast<Section_prop *>(control->GetSection("pc98"));
+        const char *layoutstr = pc98_section->Get_string("pc-98 force ibm keyboard layout");
+        if (!strcasecmp(layoutstr, "auto")) {
+            pc98_force_ibm_layout = host_keyboard_layout == DKM_US;
+            mainMenu.get_item("pc98_use_uskb").check(pc98_force_ibm_layout).refresh_item(mainMenu);
+        }
+    }
 }
 
 void SetMapperKeyboardLayout(const unsigned int dkm) {
@@ -1633,6 +1645,31 @@ bool CheckQuit(void) {
         return systemmessagebox("Quit DOSBox-X warning","You are currently running a program or game.\nAre you sure to quit anyway now?","yesno", "question", 1);
 #endif
     return true;
+}
+
+void NewInstanceEvent(bool pressed) {
+    if (!pressed) return;
+#if defined(MACOSX)
+    pid_t p = fork();
+    if (p == 0) {
+        /* child process */
+        char *argv[8];
+        extern std::string MacOSXEXEPath;
+        {
+            int fd = open("/dev/null",O_RDWR);
+            dup2(fd,0);
+            dup2(fd,1);
+            dup2(fd,2);
+            close(fd);
+        }
+        chdir("/");
+        argv[0] = (char*)MacOSXEXEPath.c_str();
+        argv[1] = NULL;
+        execv(argv[0],argv);
+        fprintf(stderr,"Failed to exec to %s\n",argv[0]);
+        _exit(1);
+    }
+#endif
 }
 
 void CPU_Snap_Back_To_Real_Mode();
@@ -3799,7 +3836,7 @@ bool readTTF(const char *fName, bool bold, bool ital) {
 }
 
 void SetBlinkRate(Section_prop* section) {
-    const char * blinkCstr = section->Get_string("ttf.blinkc");
+    const char * blinkCstr = section->Get_string("blinkc");
     unsigned int num=-1;
     if (!strcasecmp(blinkCstr, "false")||!strcmp(blinkCstr, "-1")) blinkCursor = -1;
     else if (1==sscanf(blinkCstr,"%u",&num)&&num>=0&&num<=7) blinkCursor = num;
@@ -3813,10 +3850,10 @@ void CheckTTFLimit() {
     if (ttf.cols*ttf.lins>16384) {
         if (lastset==1) {
             ttf.lins=16384/ttf.cols;
-            SetVal("render", "ttf.lins", std::to_string(ttf.lins));
+            SetVal("ttf", "lins", std::to_string(ttf.lins));
         } else if (lastset==2) {
             ttf.cols=16384/ttf.lins;
-            SetVal("render", "ttf.cols", std::to_string(ttf.cols));
+            SetVal("ttf", "cols", std::to_string(ttf.cols));
         } else {
             ttf.lins = 25;
             ttf.cols = 80;
@@ -3840,11 +3877,11 @@ void OUTPUT_TTF_Select(int fsize=-1) {
     else if (fsize>=MIN_PTSIZE)
         fontSize = fsize;
     else {
-        Section_prop * render_section=static_cast<Section_prop *>(control->GetSection("render"));
-        const char * fName = render_section->Get_string("ttf.font");
-        const char * fbName = render_section->Get_string("ttf.fontbold");
-        const char * fiName = render_section->Get_string("ttf.fontital");
-        const char * fbiName = render_section->Get_string("ttf.fontboit");
+        Section_prop * ttf_section=static_cast<Section_prop *>(control->GetSection("ttf"));
+        const char * fName = ttf_section->Get_string("font");
+        const char * fbName = ttf_section->Get_string("fontbold");
+        const char * fiName = ttf_section->Get_string("fontital");
+        const char * fbiName = ttf_section->Get_string("fontboit");
         LOG_MSG("SDL:TTF activated %s", fName);
         if (!*fName||!readTTF(fName, false, false)) {
             ttfFont = DOSBoxTTFbi;
@@ -3877,15 +3914,15 @@ void OUTPUT_TTF_Select(int fsize=-1) {
                 ttfSizebi = 0;
             }
         }
-        const char * colors = render_section->Get_string("ttf.colors");
+        const char * colors = ttf_section->Get_string("colors");
         if (*colors) {
             if (!setColors(colors,-1)) {
                 LOG_MSG("Incorrect color scheme: %s", colors);
                 //setColors("#000000 #0000aa #00aa00 #00aaaa #aa0000 #aa00aa #aa5500 #aaaaaa #555555 #5555ff #55ff55 #55ffff #ff5555 #ff55ff #ffff55 #ffffff",-1);
             }
         }
-        SetBlinkRate(render_section);
-        const char *wpstr=render_section->Get_string("ttf.wp");
+        SetBlinkRate(ttf_section);
+        const char *wpstr=ttf_section->Get_string("wp");
         wpType=0;
         wpVersion=0;
         if (strlen(wpstr)>1) {
@@ -3895,24 +3932,24 @@ void OUTPUT_TTF_Select(int fsize=-1) {
             else if (!strncasecmp(wpstr, "FE", 2)) wpType=4;
             if (strlen(wpstr)>2&&wpstr[2]>='1'&&wpstr[2]<='9') wpVersion=wpstr[2]-'0';
         }
-        wpBG = render_section->Get_int("ttf.wpbg");
-        wpFG = render_section->Get_int("ttf.wpfg");
+        wpBG = ttf_section->Get_int("wpbg");
+        wpFG = ttf_section->Get_int("wpfg");
         if (wpFG<0) wpFG = 7;
-        winPerc = render_section->Get_int("ttf.winperc");
+        winPerc = ttf_section->Get_int("winperc");
         if (winPerc>100||(fsize==2&&GFX_IsFullscreen())||(fsize!=1&&fsize!=2&&(control->opt_fullscreen||static_cast<Section_prop *>(control->GetSection("sdl"))->Get_bool("fullscreen")))) winPerc=100;
         else if (winPerc<25) winPerc=25;
         if (fsize==1&&winPerc==100) winPerc=60;
-        fontSize = render_section->Get_int("ttf.ptsize");
-        char512 = render_section->Get_bool("ttf.char512");
-        showbold = render_section->Get_bool("ttf.bold");
-        showital = render_section->Get_bool("ttf.italic");
-        showline = render_section->Get_bool("ttf.underline");
-        showsout = render_section->Get_bool("ttf.strikeout");
-        printfont = render_section->Get_bool("ttf.printfont");
-        dbcs_sbcs = render_section->Get_bool("ttf.autodbcs");
-        autoboxdraw = render_section->Get_bool("ttf.autoboxdraw");
-        halfwidthkana = render_section->Get_bool("ttf.halfwidthkana");
-        const char *outputstr=render_section->Get_string("ttf.outputswitch");
+        fontSize = ttf_section->Get_int("ptsize");
+        char512 = ttf_section->Get_bool("char512");
+        showbold = ttf_section->Get_bool("bold");
+        showital = ttf_section->Get_bool("italic");
+        showline = ttf_section->Get_bool("underline");
+        showsout = ttf_section->Get_bool("strikeout");
+        printfont = ttf_section->Get_bool("printfont");
+        dbcs_sbcs = ttf_section->Get_bool("autodbcs");
+        autoboxdraw = ttf_section->Get_bool("autoboxdraw");
+        halfwidthkana = ttf_section->Get_bool("halfwidthkana");
+        const char *outputstr=ttf_section->Get_string("outputswitch");
 #if C_DIRECT3D
         if (!strcasecmp(outputstr, "direct3d"))
             switchoutput = 6;
@@ -3932,8 +3969,8 @@ void OUTPUT_TTF_Select(int fsize=-1) {
         else
             switchoutput = -1;
 
-        ttf.lins = render_section->Get_int("ttf.lins");
-        ttf.cols = render_section->Get_int("ttf.cols");
+        ttf.lins = ttf_section->Get_int("lins");
+        ttf.cols = ttf_section->Get_int("cols");
         if (fsize&&!IS_PC98_ARCH&&!IS_EGAVGA_ARCH) ttf.lins = 25;
         if ((!CurMode||CurMode->type!=M_TEXT)&&!IS_PC98_ARCH) {
             if (ttf.cols<1) ttf.cols=80;
@@ -5609,6 +5646,22 @@ static void GUI_StartUp() {
 
     MAPPER_AddHandler(QuickLaunch, MK_q, MMODHOST, "quickrun", "Quick launch program", &item);
     item->set_text("Quick launch program...");
+#endif
+
+#if defined(MACOSX)
+    MAPPER_AddHandler(NewInstanceEvent, MK_nothing, 0, "newinst", "Start new instance", &item);
+    item->set_text("Start new instance");
+    {
+        bool enable = false;
+        extern std::string MacOSXEXEPath;
+        if (!MacOSXEXEPath.empty()) {
+            if (MacOSXEXEPath.at(0) == '/') {
+                enable = true;
+            }
+        }
+        item->enable(enable);
+        item->refresh_item(mainMenu);
+    }
 #endif
 
 #if !defined(C_EMSCRIPTEN)//FIXME: Shutdown causes problems with Emscripten
@@ -7312,12 +7365,20 @@ void SetIMPosition() {
 	uint8_t x, y;
 	uint8_t page = IS_PC98_ARCH?0:real_readb(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE);
 	INT10_GetCursorPos(&y, &x, page);
-    int nrows=25;
+    int nrows=25, ncols=80;
 	if (IS_PC98_ARCH)
 		nrows=real_readb(0x60,0x113) & 0x01 ? 25 : 20;
-	else
+	else {
 		nrows=(IS_EGAVGA_ARCH?real_readb(BIOSMEM_SEG,BIOSMEM_NB_ROWS):24)+1;
-    if (y>=nrows-1) y=nrows-8;
+		ncols=real_readw(BIOSMEM_SEG,BIOSMEM_NB_COLS);
+    }
+    if (dos.loaded_codepage == 936 || dos.loaded_codepage == 950) {
+        if (y>=nrows-1) y=nrows-8;
+        if (x>=ncols-4) x=ncols-4;
+    } else {
+        x--;
+        y--;
+    }
 
 	if ((im_x != x || im_y != y) && GetTicks() - last_ticks > 100) {
 		last_ticks = GetTicks();
@@ -7327,12 +7388,13 @@ void SetIMPosition() {
 		y++;
 #endif
 		uint8_t height = IS_PC98_ARCH?16:real_readb(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT);
+        uint8_t width = CurMode && DOSV_CheckCJKVideoMode() ? CurMode->cwidth : (height / 2);
 #if defined(USE_TTF)
         if (ttf.inUse)
             SDL_SetIMPosition((x+1) * ttf.pointsize / 2, (y+1) * ttf.pointsize);
         else
 #endif
-        SDL_SetIMPosition((x+1) * height / 2, (y+1) * height - (DOSV_CheckCJKVideoMode()?2:0));
+        SDL_SetIMPosition((x+1) * width, (y+1) * height - (DOSV_CheckCJKVideoMode()?2:0));
 	}
 }
 #endif
@@ -8221,6 +8283,10 @@ void SDL_SetupConfigSection() {
     Pstring = sdl_sec->Add_string("output", Property::Changeable::Always, "default");
     Pstring->Set_help("What video system to use for output (openglnb = OpenGL nearest; openglpp = OpenGL perfect; ttf = TrueType font output).");
     Pstring->Set_values(outputs);
+    Pstring->SetBasic(true);
+
+    Pstring = sdl_sec->Add_string("videodriver",Property::Changeable::WhenIdle, "");
+    Pstring->Set_help("Forces a video driver (e.g. windib/windows, directx, x11, fbcon, dummy, etc) for the SDL library to use.");
     Pstring->SetBasic(true);
 
     Pbool = sdl_sec->Add_bool("maximize",Property::Changeable::OnlyAtStart,false);
@@ -10209,19 +10275,26 @@ bool dos_lfn_disable_menu_callback(DOSBoxMenu * const menu,DOSBoxMenu::item * co
 }
 
 #if defined(WIN32) && !defined(HX_DOS) || defined(LINUX) || defined(MACOSX)
+extern bool winautorun, startwait, startquiet, starttranspath;
 bool dos_win_autorun_menu_callback(DOSBoxMenu * const menu,DOSBoxMenu::item * const menuitem) {
     (void)menu;//UNUSED
     (void)menuitem;//UNUSED
-    extern bool winautorun;
     winautorun = !winautorun;
     mainMenu.get_item("dos_win_autorun").check(winautorun).refresh_item(mainMenu);
+    return true;
+}
+
+bool dos_win_transpath_menu_callback(DOSBoxMenu * const menu,DOSBoxMenu::item * const menuitem) {
+    (void)menu;//UNUSED
+    (void)menuitem;//UNUSED
+    starttranspath = !starttranspath;
+    mainMenu.get_item("dos_win_transpath").check(starttranspath).refresh_item(mainMenu);
     return true;
 }
 
 bool dos_win_wait_menu_callback(DOSBoxMenu * const menu,DOSBoxMenu::item * const menuitem) {
     (void)menu;//UNUSED
     (void)menuitem;//UNUSED
-    extern bool startwait;
     startwait = !startwait;
     mainMenu.get_item("dos_win_wait").check(startwait).refresh_item(mainMenu);
     return true;
@@ -10230,7 +10303,6 @@ bool dos_win_wait_menu_callback(DOSBoxMenu * const menu,DOSBoxMenu::item * const
 bool dos_win_quiet_menu_callback(DOSBoxMenu * const menu,DOSBoxMenu::item * const menuitem) {
     (void)menu;//UNUSED
     (void)menuitem;//UNUSED
-    extern bool startquiet;
     startquiet = !startquiet;
     mainMenu.get_item("dos_win_quiet").check(startquiet).refresh_item(mainMenu);
     return true;
@@ -10664,7 +10736,7 @@ bool vid_select_ttf_font_menu_callback(DOSBoxMenu* const menu, DOSBoxMenu::item*
     (void)menu;//UNUSED
     (void)menuitem;//UNUSED
 
-    Section_prop* section = static_cast<Section_prop*>(control->GetSection("render"));
+    Section_prop* section = static_cast<Section_prop*>(control->GetSection("ttf"));
     assert(section != NULL);
 
 #if !defined(HX_DOS)
@@ -10694,7 +10766,7 @@ bool vid_select_ttf_font_menu_callback(DOSBoxMenu* const menu, DOSBoxMenu::item*
         }
 
         if (*name) {
-            SetVal("render", "ttf.font", name);
+            SetVal("ttf", "font", name);
             ttf_reset();
 #if C_PRINTER
             if (TTF_using() && printfont) UpdateDefaultPrinterFont();
@@ -11123,8 +11195,8 @@ void GetMaxWidthHeight(int *pmaxWidth, int *pmaxHeight) {
 
 #if defined(USE_TTF)
 void ttf_setlines(int cols, int lins) {
-    if (cols>0) SetVal("render", "ttf.cols", std::to_string(cols));
-    if (lins>0) SetVal("render", "ttf.lins", std::to_string(lins));
+    if (cols>0) SetVal("ttf", "cols", std::to_string(cols));
+    if (lins>0) SetVal("ttf", "lins", std::to_string(lins));
     firstset=true;
     ttf_reset();
     real_writeb(BIOSMEM_SEG,BIOSMEM_NB_COLS,ttf.cols);
@@ -11277,19 +11349,19 @@ bool ttf_style_change_callback(DOSBoxMenu * const menu,DOSBoxMenu::item * const 
     const char *mname = menuitem->get_name().c_str();
     if (!strcmp(mname, "ttf_showbold")) {
         showbold=!showbold;
-        SetVal("render", "ttf.bold", showbold?"true":"false");
+        SetVal("ttf", "bold", showbold?"true":"false");
         mainMenu.get_item(mname).check(showbold).refresh_item(mainMenu);
     } else if (!strcmp(mname, "ttf_showital")) {
         showital=!showital;
-        SetVal("render", "ttf.italic", showital?"true":"false");
+        SetVal("ttf", "italic", showital?"true":"false");
         mainMenu.get_item(mname).check(showital).refresh_item(mainMenu);
     } else if (!strcmp(mname, "ttf_showline")) {
         showline=!showline;
-        SetVal("render", "ttf.underline", showline?"true":"false");
+        SetVal("ttf", "underline", showline?"true":"false");
         mainMenu.get_item(mname).check(showline).refresh_item(mainMenu);
     } else if (!strcmp(mname, "ttf_showsout")) {
         showsout=!showsout;
-        SetVal("render", "ttf.strikeout", showsout?"true":"false");
+        SetVal("ttf", "strikeout", showsout?"true":"false");
         mainMenu.get_item(mname).check(showsout).refresh_item(mainMenu);
     } else
         return true;
@@ -11301,19 +11373,19 @@ bool ttf_wp_change_callback(DOSBoxMenu * const menu,DOSBoxMenu::item * const men
     (void)menu;//UNUSED
     const char *mname = menuitem->get_name().c_str();
     if (!strcmp(mname, "ttf_wpno")) {
-        SetVal("render", "ttf.wp", "");
+        SetVal("ttf", "wp", "");
         wpType=0;
     } else if (!strcmp(mname, "ttf_wpwp")) {
-        SetVal("render", "ttf.wp", "wp");
+        SetVal("ttf", "wp", "wp");
         wpType=1;
     } else if (!strcmp(mname, "ttf_wpws")) {
-        SetVal("render", "ttf.wp", "ws");
+        SetVal("ttf", "wp", "ws");
         wpType=2;
     } else if (!strcmp(mname, "ttf_wpxy")) {
-        SetVal("render", "ttf.wp", "xy");
+        SetVal("ttf", "wp", "xy");
         wpType=3;
     } else if (!strcmp(mname, "ttf_wpfe")) {
-        SetVal("render", "ttf.wp", "fe");
+        SetVal("ttf", "wp", "fe");
         wpType=4;
     } else
         return true;
@@ -12705,14 +12777,14 @@ int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {
 #if defined(MACOSX)
             std::string path = macosx_prompt_folder(default_folder);
             if (path.empty()) {
-                if (macosx_yesno("Run DOSBox-X?", quitstr)==1001) {
+                if (!macosx_yesno("Run DOSBox-X?", quitstr)) {
                     fprintf(stderr,"No path chosen by user, exiting\n");
                     return 1;
                 }
             } else if (workdiropt == "default") {
                 int ans=macosx_yesnocancel("DOSBox-X working directory", confirmstr);
-                if (ans == 1000) {workdirsave=1;workdirsaveas=path;}
-                else if (ans == 1001) workdirsave=2;
+                if (ans == 1) {workdirsave=1;workdirsaveas=path;}
+                else if (ans == 0) workdirsave=2;
             }
 #elif defined(WIN32) && !defined(HX_DOS)
             std::wstring path = win32_prompt_folder(default_folder);
@@ -12944,6 +13016,32 @@ int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {
 			}
 		}
 
+		// Redirect existing TTF related settings from [render] section to the [ttf] section if the latter is empty
+		Section_prop * ttf_section = static_cast<Section_prop *>(control->GetSection("ttf"));
+		assert(ttf_section != NULL);
+		extra = const_cast<char*>(ttf_section->data.c_str());
+		if (!extra||!strlen(extra)) {
+			char linestr[CROSS_LEN+1], *p;
+			Section_prop * section = static_cast<Section_prop *>(control->GetSection("render"));
+			extra = const_cast<char*>(section->data.c_str());
+			if (extra&&strlen(extra)) {
+				std::istringstream in(extra);
+				if (in)	for (std::string line; std::getline(in, line); ) {
+					if (strncasecmp(line.c_str(), "ttf.", 4)) continue;
+					if (line.length()>CROSS_LEN) {
+						strncpy(linestr, line.substr(4).c_str(), CROSS_LEN);
+						linestr[CROSS_LEN]=0;
+					} else
+						strcpy(linestr, line.substr(4).c_str());
+					p=strchr(linestr, '=');
+					if (p!=NULL&&ttf_section->HandleInputline(line.substr(4))) {
+						*p=0;
+						LOG_MSG("Redirected \"%s\" (\"ttf.%s\") from [render] to [ttf] section\n", trim(linestr), trim(linestr));
+					}
+				}
+			}
+		}
+
 		// Redirect existing video related settings from [dosbox] section to the [video] section if the latter is empty
 		Section_prop * video_section = static_cast<Section_prop *>(control->GetSection("video"));
 		assert(video_section != NULL);
@@ -12995,7 +13093,7 @@ int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {
 						}
 						if (config_section->HandleInputline(line)) {
 							*p=0;
-							LOG_MSG("Redirected \"%s\" from [dos] to [config] section\n", trim(linestr));
+							LOG_MSG("Redirected \"%s\" (\"%s\") from [dos] to [config] section\n", "dos", trim(linestr));
 						}
 					}
 				}
@@ -13274,6 +13372,12 @@ int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {
         putenv(const_cast<char*>("SDL_DISABLE_LOCK_KEYS=1"));
         LOG(LOG_GUI,LOG_DEBUG)("SDL 1.2.14 hack: SDL_DISABLE_LOCK_KEYS=1");
 #endif
+
+        std::string videodriver = static_cast<Section_prop *>(control->GetSection("sdl"))->Get_string("videodriver");
+        if (videodriver.size()) {
+            videodriver = "SDL_VIDEODRIVER="+videodriver;
+            putenv((char *)videodriver.c_str());
+        }
 
 #ifdef WIN32
         /* hack: Encourage SDL to use windib if not otherwise specified */
@@ -13859,6 +13963,8 @@ int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {
                     .enable(false)
 #endif
                     ;
+                    mainMenu.alloc_item(DOSBoxMenu::item_type_id,"dos_win_transpath").set_text("Translate paths to host system paths").
+                        set_callback_function(dos_win_transpath_menu_callback);
                     mainMenu.alloc_item(DOSBoxMenu::item_type_id,"dos_win_wait").set_text("Wait for the application if possible").
                         set_callback_function(dos_win_wait_menu_callback);
                     mainMenu.alloc_item(DOSBoxMenu::item_type_id,"dos_win_quiet").set_text("Quiet mode - no start messages").
@@ -14019,13 +14125,13 @@ int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {
             {
 #if C_DEBUG
                 DOSBoxMenu::item &item = mainMenu.alloc_item(DOSBoxMenu::submenu_type_id,"DebugMenu");
-
                 item.set_text("Debug");
+                mainMenu.alloc_item(DOSBoxMenu::item_type_id,"HelpDebugMenu")
 #else
                 DOSBoxMenu::item &item = mainMenu.alloc_item(DOSBoxMenu::submenu_type_id,"HelpDebugMenu");
-
-                item.set_text("Logging console");
+                item
 #endif
+                .set_text("Logging console");
 
                 {
                     mainMenu.alloc_item(DOSBoxMenu::item_type_id,"debug_blankrefreshtest").set_text("Refresh test (blank display)").set_callback_function(refreshtest_menu_callback);
@@ -14563,6 +14669,7 @@ fresh_boot:
 
         if (dos_kernel_shutdown) {
 
+            inshell = false;
             if (!IS_PC98_ARCH&&!IS_JEGA_ARCH&&dos.loaded_codepage!=437) dos.loaded_codepage=437;
 
             /* NTS: we take different paths depending on whether we're just shutting down DOS
@@ -14656,6 +14763,14 @@ fresh_boot:
 #if defined(WIN32) && !defined(C_SDL2)
         int Reflect_Menu(void);
         Reflect_Menu();
+#endif
+
+#if defined(USE_TTF)
+        if (ttfswitch || switch_output_from_ttf) {
+            tooutttf = true;
+            ttfswitch = switch_output_from_ttf = false;
+            mainMenu.get_item("output_ttf").enable(true).refresh_item(mainMenu);
+        }
 #endif
 
         if (run_machine) {

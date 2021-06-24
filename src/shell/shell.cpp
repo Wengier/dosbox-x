@@ -646,6 +646,8 @@ void DOS_Shell::Prepare(void) {
 #endif
             if (IS_PC98_ARCH || IS_JEGA_ARCH)
                 countryNo = 81;
+            else if (IS_DOSV)
+                countryNo = IS_PDOSV?86:(IS_CDOSV?886:(IS_KDOSV?82:81));
 #if defined(WIN32)
 			else if (GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_ICOUNTRY, buffer, 128)) {
 				countryNo = uint16_t(atoi(buffer));
@@ -1220,7 +1222,6 @@ void SHELL_Init() {
 	MSG_Add("SHELL_CMD_HELP_END2","Type \033[33;1mHELP command\033[0m or \033[33;1mcommand /?\033[0m for help information for the specified command.\n");
 	MSG_Add("SHELL_CMD_ECHO_ON","ECHO is on.\n");
 	MSG_Add("SHELL_CMD_ECHO_OFF","ECHO is off.\n");
-	MSG_Add("SHELL_ILLEGAL_CONTROL_CHARACTER","Unexpected control character: Dec %03u and Hex %#04x.\n");
 	MSG_Add("SHELL_ILLEGAL_SWITCH","Invalid switch - %s\n");
 	MSG_Add("SHELL_MISSING_PARAMETER","Required parameter missing.\n");
 	MSG_Add("SHELL_MISSING_FILE","The following file is missing or corrupted: %s\n");
@@ -1549,7 +1550,7 @@ void SHELL_Init() {
 	MSG_Add("SHELL_CMD_MORE_HELP","Displays output one screen at a time.\n");
 	MSG_Add("SHELL_CMD_MORE_HELP_LONG","MORE [drive:][path][filename]\nMORE < [drive:][path]filename\ncommand-name | MORE [drive:][path][filename]\n");
 	MSG_Add("SHELL_CMD_TRUENAME_HELP","Finds the fully-expanded name for a file.\n");
-	MSG_Add("SHELL_CMD_TRUENAME_HELP_LONG","TRUENAME file\n");
+	MSG_Add("SHELL_CMD_TRUENAME_HELP_LONG","TRUENAME [/H] file\n");
 	MSG_Add("SHELL_CMD_DXCAPTURE_HELP","Runs program with video or audio capture.\n");
 	MSG_Add("SHELL_CMD_DXCAPTURE_HELP_LONG","DX-CAPTURE [/V|/-V] [/A|/-A] [/M|/-M] [command] [options]\n\nIt will start video or audio capture, run program, and then automatically stop capture when the program exits.\n");
 #if C_DEBUG

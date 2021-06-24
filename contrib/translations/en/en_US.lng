@@ -776,9 +776,6 @@ ECHO is on.◙
 :SHELL_CMD_ECHO_OFF
 ECHO is off.◙
 .
-:SHELL_ILLEGAL_CONTROL_CHARACTER
-Unexpected control character: Dec %03u and Hex %#04x.◙
-.
 :SHELL_ILLEGAL_SWITCH
 Invalid switch - %s◙
 .
@@ -1263,7 +1260,7 @@ MORE [drive:][path][filename]◙MORE < [drive:][path]filename◙command-name | M
 Finds the fully-expanded name for a file.◙
 .
 :SHELL_CMD_TRUENAME_HELP_LONG
-TRUENAME file◙
+TRUENAME [/H] file◙
 .
 :SHELL_CMD_DXCAPTURE_HELP
 Runs program with video or audio capture.◙
@@ -1859,6 +1856,9 @@ Host system applications
 :MENU:dos_win_autorun
 Launch to run on the Windows host
 .
+:MENU:dos_win_transpath
+Translate paths to host system paths
+.
 :MENU:dos_win_wait
 Wait for the application if possible
 .
@@ -2143,6 +2143,9 @@ TRUENAME
 .
 :MENU:DebugMenu
 Debug
+.
+:MENU:HelpDebugMenu
+Logging console
 .
 :MENU:debug_blankrefreshtest
 Refresh test (blank display)

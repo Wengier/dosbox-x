@@ -1237,10 +1237,6 @@ ECHO は <ON> です。
 ECHO は <OFF> です。
 
 .
-:SHELL_ILLEGAL_CONTROL_CHARACTER
-無効なコントロール文字: 10進 %03u 16進 %#04x.
-
-.
 :SHELL_ILLEGAL_SWITCH
 無効なスイッチ - %s
 
@@ -2079,7 +2075,7 @@ command-name | MORE [drive:][path][filename]
 
 .
 :SHELL_CMD_TRUENAME_HELP_LONG
-TRUENAME file
+TRUENAME [/H] file
 
 .
 :SHELL_CMD_DXCAPTURE_HELP
@@ -2693,6 +2689,9 @@ EMS エミュレーション:無効
 :MENU:dos_win_autorun
 Windows のホスト上で実行する
 .
+:MENU:dos_win_transpath
+パスをホストシステムパスに変換します
+.
 :MENU:dos_win_wait
 可能であればアプリケーションを待つ
 .
@@ -2809,6 +2808,9 @@ Windowsのドライブを自動マウント
 .
 :MENU:HelpMenu
 ヘルプ
+.
+:MENU:HelpDebugMenu
+ログ用コンソール
 .
 :MENU:help_intro
 DOSBox-Xの紹介

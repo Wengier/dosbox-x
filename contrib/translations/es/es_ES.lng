@@ -1036,9 +1036,6 @@ ECHO está activado.◙
 :SHELL_CMD_ECHO_OFF
 ECHO está desactivado.◙
 .
-:SHELL_ILLEGAL_CONTROL_CHARACTER
-Carácter de control inesperado: Dec %03u y Hex %#04x.◙
-.
 :SHELL_ILLEGAL_SWITCH
 Parámetro no válido - %s◙
 .
@@ -1627,7 +1624,7 @@ MORE [unidad:][ruta][nombrearchivo]◙MORE < [unidad:][ruta][nombrearchivo]◙no
 Busca el nombre completamente expandido de un archivo.◙
 .
 :SHELL_CMD_TRUENAME_HELP_LONG
-TRUENAME archivo◙
+TRUENAME [/H] archivo◙
 .
 :SHELL_CMD_DXCAPTURE_HELP
 Ejecuta un programa con captura de video o audio.◙
@@ -2220,6 +2217,9 @@ Aplicaciones de host
 :MENU:dos_win_autorun
 Lanzar para ejecutar en host Windows
 .
+:MENU:dos_win_transpath
+Traducir rutas a rutas del sistema host
+.
 :MENU:dos_win_wait
 Esperar a la aplicación si es posible
 .
@@ -2504,6 +2504,9 @@ TRUENAME
 .
 :MENU:DebugMenu
 Depurador
+.
+:MENU:HelpDebugMenu
+Consola de registro
 .
 :MENU:debug_blankrefreshtest
 Prueba de refresco (pantalla en blanco)

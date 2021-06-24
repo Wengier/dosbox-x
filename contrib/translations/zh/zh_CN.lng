@@ -1262,10 +1262,6 @@ ECHO状态为开.
 ECHO状态为关.
 
 .
-:SHELL_ILLEGAL_CONTROL_CHARACTER
-未预期的控制字符: 10进制 %03u - 16进制 %#04x.
-
-.
 :SHELL_ILLEGAL_SWITCH
 开关非法 - %s
 
@@ -2057,7 +2053,7 @@ MORE < [驱动器:][路径]文件名
 
 .
 :SHELL_CMD_TRUENAME_HELP_LONG
-TRUENAME 文件
+TRUENAME [/H] 文件
 
 .
 :SHELL_CMD_DXCAPTURE_HELP
@@ -2699,6 +2695,9 @@ EMM386 模拟
 :MENU:dos_win_autorun
 自动在 Windows 主机中运行
 .
+:MENU:dos_win_transpath
+将路径转换为主机系统路径
+.
 :MENU:dos_win_wait
 等待应用程序 (如果可能)
 .
@@ -2983,6 +2982,9 @@ TRUENAME
 .
 :MENU:DebugMenu
 调试
+.
+:MENU:HelpDebugMenu
+记录控制台
 .
 :MENU:debug_blankrefreshtest
 刷新测试 (空白显示)

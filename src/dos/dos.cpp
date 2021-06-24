@@ -26,6 +26,7 @@
 #include <ctype.h>
 #include <sys/stat.h>
 
+#include "control.h"
 #include "dosbox.h"
 #include "dos_inc.h"
 #include "bios.h"
@@ -34,6 +35,7 @@
 #include "paging.h"
 #include "callback.h"
 #include "regs.h"
+#include "timer.h"
 #include "menu.h"
 #include "mapper.h"
 #include "drives.h"
@@ -137,8 +139,8 @@ int maxdrive=1;
 int enablelfn=-1;
 bool uselfn, winautorun=false;
 extern int infix, log_dev_con;
-extern bool int15_wait_force_unmask_irq, shellrun, logging_con;
-extern bool winrun, startcmd, startwait, startquiet, ctrlbrk, i4dos;
+extern bool int15_wait_force_unmask_irq, shellrun, logging_con, ctrlbrk;
+extern bool winrun, startcmd, startwait, startquiet, starttranspath, i4dos;
 extern bool startup_state_numlock, mountwarning, clipboard_dosapi;
 std::string startincon;
 
@@ -621,6 +623,52 @@ typedef struct {
 	UINT8 reserved[8];
 } ext_space_info_t;
 
+char res1[CROSS_LEN] = {0}, res2[CROSS_LEN], *result;
+const char * TranslateHostPath(const char * arg, bool next = false) {
+    result = next ? res2: res1;
+    if (!starttranspath) {
+        strcpy(result, arg);
+        return result;
+    }
+    std::string args = arg;
+    size_t spos = 0, epos = 0, lastpos;
+    while (1) {
+        lastpos = spos;
+        spos += epos+args.substr(lastpos+epos).find_first_not_of(' ');
+        if (spos<lastpos+epos) {
+            strcat(result, args.substr(lastpos+epos).c_str());
+            break;
+        }
+        if (!lastpos&&!epos) strcpy(result, args.substr(0, spos).c_str());
+        else strcat(result, args.substr(lastpos+epos, spos-lastpos-epos).c_str());
+        if (arg[spos] == '"') {
+            epos = args.substr(spos+1).find("\" ");
+            if (epos == std::string::npos) epos = args.size() - spos;
+            else epos += 2;
+        } else {
+            epos = args.substr(spos).find_first_of(' ');
+            if (epos == std::string::npos) epos = args.size() - spos;
+        }
+        char fullname[DOS_PATHLENGTH];
+        uint8_t drive;
+        if (DOS_MakeName(args.substr(spos, epos).c_str(), fullname, &drive) && (!strncmp(Drives[drive]->GetInfo(),"local ",6) || !strncmp(Drives[drive]->GetInfo(),"CDRom ",6))) {
+           localDrive *ldp = dynamic_cast<localDrive*>(Drives[drive]);
+           Overlay_Drive *odp = dynamic_cast<Overlay_Drive*>(Drives[drive]);
+           std::string hostname = "";
+           if (odp) hostname = odp->GetHostName(fullname);
+           else if (ldp) hostname = ldp->GetHostName(fullname);
+           if (hostname.size()) {
+               if (arg[spos] == '"') strcat(result, "\"");
+               strcat(result, hostname.c_str());
+               if (arg[spos] == '"') strcat(result, "\"");
+           } else
+               strcat(result, args.substr(spos, epos).c_str());
+        } else
+            strcat(result, args.substr(spos, epos).c_str());
+    }
+    return result;
+}
+
 #if defined (WIN32) && !defined(HX_DOS)
 intptr_t hret=0;
 void EndRunProcess() {
@@ -682,7 +730,7 @@ void HostAppRun() {
         if (SetCurrentDirectory(winDirNew)) {
             SHELLEXECUTEINFO lpExecInfo;
             strcpy(comline, appargs);
-            strcpy(comline, trim(p));
+            strcpy(comline, trim((char *)TranslateHostPath(p)));
             if (!startquiet) {
                 char msg[]="Now run it as a Windows application...\r\n";
                 uint16_t s = (uint16_t)strlen(msg);
@@ -1281,6 +1329,61 @@ static Bitu DOS_21Handler(void) {
             }
             break;
         case 0x2b:      /* Set System Date */
+            if (reg_cx==0x4442 && reg_dx==0x2D58 && reg_al < 0x10) { // Special DOSBox-X functions (4442 = 'DB', 2D58 = '-X')
+                const char * ver = strchr(VERSION, '.');
+                switch (reg_al) {
+                    case 0: // DOSBox-X installation check
+                        reg_al = 0;
+                        break;
+                    case 1: // DOSBox-X SDL version check
+                        reg_al = 0;
+#if defined(C_SDL2)
+                        reg_ah = 2; // SDL2
+#elif defined(SDL_DOSBOX_X_SPECIAL)
+                        reg_ah = 1; // SDL1 (modified)
+#else
+                        reg_ah = 0; // SDL1 (original)
+#endif
+                        break;
+                    case 2: // DOSBox-X platform check
+                        reg_al = 0;
+#if defined(HX_DOS)
+                        reg_bh = 4;
+#elif defined(WIN32)
+                        reg_bh = 1;
+#elif defined(LINUX)
+                        reg_bh = 2;
+#elif defined(MACOSX)
+                        reg_bh = 3;
+#elif defined(OS2)
+                        reg_bh = 5;
+#else
+                        reg_bh = 0;
+#endif
+#if defined(_M_X64) || defined (_M_AMD64) || defined (_M_ARM64) || defined (_M_IA64) || defined(__ia64__) || defined(__LP64__) || defined(_WIN64) || defined(__x86_64__) || defined(__aarch64__) || defined(__powerpc64__)
+                        reg_bl = 2; // 64-bit
+#else
+                        reg_bl = 1; // 32-bit
+#endif
+                        break;
+                    case 3: // DOSBox-X machine check
+                        reg_al = 0;
+                        reg_ah = machine;
+                        break;
+                    case 4: // DOSBox-X version check
+                        reg_al = 0;
+                        reg_ah = ver == NULL ? 0 : atoi(std::string(ver).substr(0, strlen(ver) - strlen(VERSION)).c_str()); // AH: e.g. 0
+                        reg_bh = ver == NULL ? 0 : atoi(ver + 1); // BH: e.g. 83
+                        ver = strchr(ver + 1, '.');
+                        reg_bl = ver == NULL ? 0 : atoi(ver + 1); // BL: e.g. 15
+                        break;
+                    default:
+                        LOG_MSG("DOSBox-X:Illegal subfunction %2X",reg_al);
+                        reg_ax=1;
+                        break;
+                }
+                break;
+            }
             if(date_host_forced) {
                 // unfortunately, BIOS does not return whether succeeded
                 // or not, so do a sanity check first
@@ -3987,6 +4090,7 @@ public:
             enable_config_as_shell_commands = section->Get_bool("shell configuration as commands");
             startwait = section->Get_bool("startwait");
             startquiet = section->Get_bool("startquiet");
+            starttranspath = section->Get_bool("starttranspath");
             winautorun=startcmd;
             first_run=false;
         }
@@ -4002,6 +4106,13 @@ public:
         mainMenu.get_item("dos_win_autorun").check(winautorun).enable(true).refresh_item(mainMenu);
 #endif
 #if defined(WIN32) && !defined(HX_DOS) || defined(LINUX) || defined(MACOSX)
+        mainMenu.get_item("dos_win_transpath").check(starttranspath).enable(
+#if defined(WIN32) && !defined(HX_DOS)
+        true
+#else
+        startcmd
+#endif
+        ).refresh_item(mainMenu);
         mainMenu.get_item("dos_win_wait").check(startwait).enable(
 #if defined(WIN32) && !defined(HX_DOS)
         true
@@ -4042,6 +4153,7 @@ public:
 		mainMenu.get_item("dos_win_autorun").enable(false).refresh_item(mainMenu);
 #endif
 #if defined(WIN32) && !defined(HX_DOS) || defined(LINUX) || defined(MACOSX)
+		mainMenu.get_item("dos_win_transpath").enable(false).refresh_item(mainMenu);
 		mainMenu.get_item("dos_win_wait").enable(false).refresh_item(mainMenu);
 		mainMenu.get_item("dos_win_quiet").enable(false).refresh_item(mainMenu);
 #endif
