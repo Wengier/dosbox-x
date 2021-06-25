@@ -36,7 +36,7 @@
 #include "menu.h"
 #include "SDL.h"
 
-extern bool isDBCSCP(), isKanji1(uint8_t chr), shiftjis_lead_byte(int c);
+extern bool gbk, isDBCSCP(), isKanji1(uint8_t chr), shiftjis_lead_byte(int c);
 
 void upcase(std::string &str) {
 	int (*tf)(int) = std::toupper;
@@ -63,7 +63,7 @@ void trim(std::string &str) {
 char *strchr_dbcs(char *str, char ch) {
     bool lead = false;
     int lastpos = -1;
-    if (ch == '\\' && (IS_PC98_ARCH || isDBCSCP())) {
+    if (ch == '\\' && (IS_PC98_ARCH || isDBCSCP()) || ch == '|' && (IS_PC98_ARCH || isDBCSCP() && !((dos.loaded_codepage == 936 || IS_PDOSV) && !gbk))) {
         for (size_t i=0; i<strlen(str); i++) {
             if (lead) lead = false;
             else if ((IS_PC98_ARCH && shiftjis_lead_byte(str[i])) || (isDBCSCP() && isKanji1(str[i]))) lead = true;
@@ -77,7 +77,7 @@ char *strchr_dbcs(char *str, char ch) {
 char *strrchr_dbcs(char *str, char ch) {
     bool lead = false;
     int lastpos = -1;
-    if (ch == '\\' && (IS_PC98_ARCH || isDBCSCP())) {
+    if (ch == '\\' && (IS_PC98_ARCH || isDBCSCP()) || ch == '|' && (IS_PC98_ARCH || isDBCSCP() && !((dos.loaded_codepage == 936 || IS_PDOSV) && !gbk))) {
         for (size_t i=0; i<strlen(str); i++) {
             if (lead) lead = false;
             else if ((IS_PC98_ARCH && shiftjis_lead_byte(str[i])) || (isDBCSCP() && isKanji1(str[i]))) lead = true;
@@ -88,7 +88,7 @@ char *strrchr_dbcs(char *str, char ch) {
         return strrchr(str, ch);
 }
 
-char* strtok_dbcs(char *s, const char *d) {
+char *strtok_dbcs(char *s, const char *d) {
     if (!IS_PC98_ARCH && !isDBCSCP()) return strtok(s, d);
     static char* input = NULL;
     if (s != NULL) input = s;
