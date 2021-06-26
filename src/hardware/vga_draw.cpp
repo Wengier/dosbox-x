@@ -39,6 +39,7 @@
 #include "timer.h"
 #include "config.h"
 #include "control.h"
+#include "shiftjis.h"
 #include "../ints/int10.h"
 #include "pc98_cg.h"
 #include "pc98_gdc.h"
@@ -2025,20 +2026,20 @@ template <const unsigned int card,typename templine_type_t> static inline uint8_
                             if (exattr & 0x10) fline = (fline >> 1) + 8;
                             else fline = fline >> 1;
                         }
-                        GetDbcsFont(chr);
+                        uint8_t *f = GetDbcsFont(chr);
                         if (exattr & 0x40) {
-                            Bitu font = jfont_dbcs_16[chr * 32 + fline * 2];
+                            Bitu font = f[fline * 2];
                             if (!(exattr & 0x08))
-                                font = jfont_dbcs_16[chr * 32 + fline * 2 + 1];
+                                font = f[fline * 2 + 1];
                             for (Bitu n = 0; n < 8; n++) {
                                 *draw++ = vga.attr.palette[(font & 0x80) ? foreground : background];
                                 *draw++ = vga.attr.palette[(font & 0x80) ? foreground : background];
                                 font <<= 1;
                             }
                         } else {
-                            Bitu font = jfont_dbcs_16[chr * 32 + fline * 2];
+                            Bitu font = f[fline * 2];
                             font <<= 8;
-                            font |= jfont_dbcs_16[chr * 32 + fline * 2 + 1];
+                            font |= f[fline * 2 + 1];
                             if (exattr &= 0x80)
                             {
                                 Bitu font2 = font;
@@ -3319,7 +3320,13 @@ bool isDBCSCP() {
     return !IS_PC98_ARCH && (IS_JEGA_ARCH||IS_DOSV||dos.loaded_codepage==932||dos.loaded_codepage==936||dos.loaded_codepage==949||dos.loaded_codepage==950) && enable_dbcs_tables;
 }
 
-bool isDBCSLB(uint8_t chr, uint8_t* lead) {
+bool isDBCSLB(uint8_t chr) {
+    for (int i=0; i<6; i++) lead[i] = 0;
+    if (isDBCSCP())
+        for (int i=0; i<6; i++) {
+            lead[i] = mem_readb(Real2Phys(dos.tables.dbcs)+i);
+            if (lead[i] == 0) break;
+        }
     return isDBCSCP() && ((lead[0]>=0x80 && lead[1] > lead[0] && chr >= lead[0] && chr <= lead[1]) || (lead[2]>=0x80 && lead[3] > lead[2] && chr >= lead[2] && chr <= lead[3]) || (lead[4]>=0x80 && lead[5] > lead[4] && chr >= lead[4] && chr <= lead[5]));
 }
 
@@ -3875,6 +3882,7 @@ static void VGA_VerticalTimer(Bitu /*val*/) {
                             text[2]=0;
                             uname[0]=0;
                             uname[1]=0;
+                            if (del_flag && text[1] == 0x7F) text[1] = 0x80;
                             CodePageGuestToHostUTF16(uname,text);
                             if (uname[0]!=0&&uname[1]==0) {
                                 (*draw).chr=uname[0];
@@ -3939,12 +3947,6 @@ static void VGA_VerticalTimer(Bitu /*val*/) {
             }
         } else if (CurMode&&CurMode->type==M_TEXT) {
             bool dbw, dex, bd[txtMaxCols];
-            for (int i=0; i<6; i++) lead[i] = 0;
-            if (isDBCSCP())
-                for (int i=0; i<6; i++) {
-                    lead[i] = mem_readb(Real2Phys(dos.tables.dbcs)+i);
-                    if (lead[i] == 0) break;
-                }
             if (IS_EGAVGA_ARCH) {
                 for (Bitu row=0;row < ttf.lins;row++) {
                     const uint32_t* vidmem = ((uint32_t*)vga.draw.linear_base)+vidstart;	// pointer to chars+attribs (EGA/VGA planar memory)
@@ -3962,7 +3964,7 @@ static void VGA_VerticalTimer(Bitu /*val*/) {
                         } else if (dbw) {
                             (*draw).skipped = 1;
                             dbw=dex=false;
-                        } else if (dbcs_sbcs && col<ttf.cols-1 && isDBCSLB((*draw).chr, lead) && (*(vidmem+2) & 0xFF) >= 0x40) {
+                        } else if (dbcs_sbcs && col<ttf.cols-1 && isKanji1((*draw).chr) && (*(vidmem+2) & 0xFF) >= 0x40) {
                             bool boxdefault = (!autoboxdraw || col>=ttf.cols-3) && !bd[col];
                             if (!boxdefault && col<ttf.cols-3) {
                                 if (CheckBoxDrawing((uint8_t)((*draw).chr), (uint8_t)*(vidmem+2), (uint8_t)*(vidmem+4), (uint8_t)*(vidmem+6)))
@@ -3977,6 +3979,7 @@ static void VGA_VerticalTimer(Bitu /*val*/) {
                                 text[2]=0;
                                 uname[0]=0;
                                 uname[1]=0;
+                                if ((IS_JDOSV || dos.loaded_codepage == 932) && del_flag && text[1] == 0x7F) text[1] = 0x80;
                                 CodePageGuestToHostUTF16(uname,text);
                                 if (uname[0]!=0&&uname[1]==0) {
                                     (*draw).chr=uname[0];
@@ -4021,7 +4024,7 @@ static void VGA_VerticalTimer(Bitu /*val*/) {
                         } else if (dbw) {
                             (*draw).skipped = 1;
                             dbw=dex=false;
-                        } else if (dbcs_sbcs && col<ttf.cols-1 && isDBCSLB((*draw).chr, lead) && (*(vidmem+1) & 0xFF) >= 0x40) {
+                        } else if (dbcs_sbcs && col<ttf.cols-1 && isKanji1((*draw).chr) && (*(vidmem+1) & 0xFF) >= 0x40) {
                             bool boxdefault = (!autoboxdraw || col>=ttf.cols-3) && !bd[col];
                             if (!boxdefault && col<ttf.cols-3) {
                                 if (CheckBoxDrawing((uint8_t)((*draw).chr), (uint8_t)*(vidmem+1), (uint8_t)*(vidmem+2), (uint8_t)*(vidmem+3)))
@@ -4036,6 +4039,7 @@ static void VGA_VerticalTimer(Bitu /*val*/) {
                                 text[2]=0;
                                 uname[0]=0;
                                 uname[1]=0;
+                                if ((IS_JDOSV || dos.loaded_codepage == 932) && del_flag && text[1] == 0x7F) text[1] = 0x80;
                                 CodePageGuestToHostUTF16(uname,text);
                                 if (uname[0]!=0&&uname[1]==0) {
                                     (*draw).chr=uname[0];

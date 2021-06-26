@@ -32,7 +32,9 @@
 #include "regs.h"
 #include <string.h>
 
-uint8_t prevchr = 0;
+uint8_t prevchr = 0, pattr = 0;
+uint16_t pcol = 0, prow = 0, pchr = 0;
+bool CheckBoxDrawing(uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4);
 uint8_t DefaultANSIAttr();
 uint16_t GetTextSeg();
 
@@ -429,6 +431,14 @@ void WriteCharDOSVSbcs(uint16_t col, uint16_t row, uint8_t chr, uint8_t attr) {
 }
 
 void WriteCharDOSVDbcs(uint16_t col, uint16_t row, uint16_t chr, uint8_t attr) {
+	if (IS_DOSV && !IS_JDOSV && col == pcol+2 && row == prow && attr == pattr && CheckBoxDrawing(pchr / 0x100, pchr & 0xFF, chr / 0x100, chr & 0xFF)) {
+		WriteCharDOSVSbcs(col - 2, row, pchr / 0x100, attr);
+		WriteCharDOSVSbcs(col - 1, row, pchr & 0xFF, attr);
+		WriteCharDOSVSbcs(col, row, chr / 0x100, attr);
+		WriteCharDOSVSbcs(col + 1, row, chr & 0xFF, attr);
+		pcol = col;prow = row;pchr = chr;pattr = attr;
+		return;
+	}
 	Bitu off;
 	uint16_t data;
 	uint16_t *font;
@@ -508,6 +518,7 @@ void WriteCharDOSVDbcs(uint16_t col, uint16_t row, uint16_t chr, uint8_t attr) {
 			IO_Write(0x3cd, select);
 		}
 	}
+	pcol = col;prow = row;pchr = chr;pattr = attr;
 }
 
 void WriteCharTopView(uint16_t off, int count) {
@@ -517,17 +528,17 @@ void WriteCharTopView(uint16_t off, int count) {
 	uint16_t width = real_readw(BIOSMEM_SEG, BIOSMEM_NB_COLS);
 	col = (off / 2) % width;
 	row = (off / 2) / width;
-	while(count > 0) {
+	while (count > 0) {
 		code = real_readb(seg, off);
 		attr = real_readb(seg, off + 1);
-		if(isKanji1(code)) {
+		if (isKanji1(code) && isKanji2(real_readb(seg, off + 2)) && (IS_JDOSV || dos.loaded_codepage == 932 || col < width - 1)) {
 			real_writeb(seg, row * width * 2 + col * 2, code);
 			real_writeb(seg, row * width * 2 + col * 2 + 1, attr);
 			off += 2;
 			WriteCharDOSVDbcs(col, row, ((uint16_t)code << 8) | real_readb(seg, off), attr);
 			count--;
 			col++;
-			if(col >= width) {
+			if (col >= width) {
 				col = 0;
 				row++;
 			}
@@ -539,7 +550,7 @@ void WriteCharTopView(uint16_t off, int count) {
 			WriteCharDOSVSbcs(col, row, code, attr);
 		}
 		col++;
-		if(col >= width) {
+		if (col >= width) {
 			col = 0;
 			row++;
 		}
@@ -979,14 +990,13 @@ void WriteCharJ(uint16_t col, uint16_t row, uint8_t page, uint8_t chr, uint8_t a
 	x = (pos%CurMode->twidth - 1) * 8;//move right 1 column.
 	y = (pos / CurMode->twidth)*cheight;
 
-	GetDbcsFont(sjischr);
-
 	uint16_t ty = (uint16_t)y;
+	uint8_t *font = GetDbcsFont(sjischr);
 	for (uint8_t h = 0; h<16 ; h++) {
 		uint16_t bitsel = 0x8000;
-		uint16_t bitline = jfont_dbcs_16[sjischr * 32 + h * 2];
+		uint16_t bitline = font[h * 2];
 		bitline <<= 8;
-		bitline |= jfont_dbcs_16[sjischr * 32 + h * 2 + 1];
+		bitline |= font[h * 2 + 1];
 		uint16_t tx = (uint16_t)x;
 		while (bitsel) {
 			INT10_PutPixel(tx, ty, page, (bitline&bitsel) ? attr : back);
@@ -1087,23 +1097,21 @@ void WriteChar(uint16_t col,uint16_t row,uint8_t page,uint16_t chr,uint8_t attr,
 				SetVTRAMChar(col, row, chr, attr);
 			if (isKanji1(chr) && prevchr == 0)
 				prevchr = chr;
-			else if (isKanji2(chr) && prevchr != 0)
-			{
+			else if (isKanji2(chr) && prevchr != 0) {
 				WriteCharJ(col, row, page, chr, attr, useattr);
 				prevchr = 0;
 				return;
 			}
-		} else if(IS_DOSV && DOSV_CheckCJKVideoMode()) {
+		} else if (IS_DOSV && DOSV_CheckCJKVideoMode()) {
 			DOSV_OffCursor();
-
 			uint16_t seg = GetTextSeg();
 			uint16_t width = real_readw(BIOSMEM_SEG,BIOSMEM_NB_COLS);
 			real_writeb(seg, row * width * 2 + col * 2, chr);
 			if (useattr)
 				real_writeb(seg, row * width * 2 + col * 2 + 1, attr);
-			if (isKanji1(chr) && prevchr == 0 && (IS_JDOSV || col < width-1)) {
+			if (isKanji1(chr) && prevchr == 0 && (IS_JDOSV || col < width - 1))
 				prevchr = chr;
-			} else if (isKanji2(chr) && prevchr != 0 && (IS_JDOSV || col)) {
+			else if (isKanji2(chr) && prevchr != 0 && (IS_JDOSV || col)) {
 				WriteCharDOSVDbcs(col - 1, row, (prevchr << 8) | chr, attr);
 				prevchr = 0;
 				return;
@@ -1112,8 +1120,8 @@ void WriteChar(uint16_t col,uint16_t row,uint8_t page,uint16_t chr,uint8_t attr,
 			WriteCharDOSVSbcs(col, row, chr, attr);
 			return;
 		}
-        fontdata=RealGetVec(0x43);
-        break;
+		fontdata=RealGetVec(0x43);
+		break;
     }
     fontdata=RealMake(RealSeg(fontdata),RealOff(fontdata)+chr*cheight);
 

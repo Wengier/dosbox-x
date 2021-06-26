@@ -22,6 +22,9 @@
     the drive is not mounted if so. You can make the
     message shorter with the -q option, and filter out
     non-local drives with "-o local" option. (Wengier)
+  - Added NE2000.COM (packet driver for NE2000 network
+    card) which will appear in Z:\SYSTEM directory when
+    NE2000 networking feature is enabled. (Wengier)
   - Added /H option to TRUENAME command to return the
     full filename on the host system for a specified
     file/directory on a mounted local drive. (Wengier)
@@ -119,6 +122,9 @@
     in "drivez" folder (for customization of Virtual
     Drive Z:) so that they will appear properly on this
     drive according to the code page set. (Wengier)
+  - Improved support for DBCS characters on mounted FAT
+    drives and clipboard copy for DBCS characters with
+    TrueType font output in standard mode. (Wengier)
   - The "Unexpected control character" error message
     which may appear when executing certain batch files
     is now a debug message (belong to the "misc" type)
