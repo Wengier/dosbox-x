@@ -1949,6 +1949,15 @@ static uint8_t * Alt_MDA_TEXT_Draw_Line(Bitu /*vidstart*/, Bitu /*line*/) {
     return Alt_MDA_COMMON_TEXT_Draw_Line();
 }
 
+std::vector<std::pair<int,int>> jtbs = {};
+struct first_equal {
+    const int value;
+    first_equal(int v):value(v) {}
+    bool operator()(std::pair<int,int> &pair) {
+        return pair.first == value;
+    }
+};
+
 template <const unsigned int card,typename templine_type_t> static inline uint8_t* EGAVGA_TEXT_Combined_Draw_Line(Bitu vidstart,Bitu line) {
     // keep it aligned:
     templine_type_t* draw = ((templine_type_t*)TempLine) + 16 - vga.draw.panning;
@@ -1960,6 +1969,8 @@ template <const unsigned int card,typename templine_type_t> static inline uint8_
 	Bitu chr, chr_left, attr, bsattr;
 	bool chr_wide = false;
 
+    unsigned int row = (vidstart - vga.config.real_start - vga.draw.bytes_skip) / vga.draw.address_add, col = 0;
+    if (IS_JEGA_ARCH && !jtbs.empty() && line == 1) jtbs.erase(std::remove_if(jtbs.begin(), jtbs.end(), first_equal(row)), jtbs.end());
     while (blocks--) {
         if (isJEGAEnabled()) {
             VGA_Latch pixels;
@@ -1968,14 +1979,12 @@ template <const unsigned int card,typename templine_type_t> static inline uint8_
             chr = pixels.b[0];
             attr = pixels.b[1];
             if (!chr_wide) {
-                if (!(jega.RMOD2 & 0x80))
-                {
+                if (!(jega.RMOD2 & 0x80)) {
                     background = attr >> 4;
                     foreground = (vga.draw.blink || (!(attr & 0x80))) ? (attr & 0xf) : background;
                     if (vga.draw.blinking) background &= ~0x8;
                     bsattr = 0;
-                }
-                else {
+                } else {
                     foreground = (vga.draw.blink || (!(attr & 0x80))) ? (attr & 0xf) : background;
                     background = 0;
                     bsattr = attr;
@@ -2019,6 +2028,7 @@ template <const unsigned int card,typename templine_type_t> static inline uint8_
                 }
                 if (line >= pad_y && line < 16 + pad_y) {
                     if (isKanji2(chr)) {
+                        if (line == 1) jtbs.push_back(std::make_pair(row, col));
                         Bitu fline = line - pad_y;
                         chr_left <<= 8;
                         chr |= chr_left;
@@ -2065,6 +2075,7 @@ template <const unsigned int card,typename templine_type_t> static inline uint8_
                 chr_wide=false;
                 blocks--;
             }
+            col++;
         } else {
             VGA_Latch pixels;
 
@@ -2110,6 +2121,7 @@ template <const unsigned int card,typename templine_type_t> static inline uint8_
             }
         }
     }
+
     // draw the text mode cursor if needed
     if ((vga.draw.cursor.count&0x8) && (line >= vga.draw.cursor.sline) && (line <= vga.draw.cursor.eline) && vga.draw.cursor.enabled) {
         // the address of the attribute that makes up the cell the cursor is in
@@ -3882,7 +3894,7 @@ static void VGA_VerticalTimer(Bitu /*val*/) {
                             text[2]=0;
                             uname[0]=0;
                             uname[1]=0;
-                            if (del_flag && text[1] == 0x7F) text[1] = 0x80;
+                            if (del_flag && text[1] == 0x7F) text[1]++;
                             CodePageGuestToHostUTF16(uname,text);
                             if (uname[0]!=0&&uname[1]==0) {
                                 (*draw).chr=uname[0];
@@ -3979,7 +3991,7 @@ static void VGA_VerticalTimer(Bitu /*val*/) {
                                 text[2]=0;
                                 uname[0]=0;
                                 uname[1]=0;
-                                if ((IS_JDOSV || dos.loaded_codepage == 932) && del_flag && text[1] == 0x7F) text[1] = 0x80;
+                                if ((IS_JDOSV || dos.loaded_codepage == 932) && del_flag && text[1] == 0x7F) text[1]++;
                                 CodePageGuestToHostUTF16(uname,text);
                                 if (uname[0]!=0&&uname[1]==0) {
                                     (*draw).chr=uname[0];
@@ -4039,7 +4051,7 @@ static void VGA_VerticalTimer(Bitu /*val*/) {
                                 text[2]=0;
                                 uname[0]=0;
                                 uname[1]=0;
-                                if ((IS_JDOSV || dos.loaded_codepage == 932) && del_flag && text[1] == 0x7F) text[1] = 0x80;
+                                if ((IS_JDOSV || dos.loaded_codepage == 932) && del_flag && text[1] == 0x7F) text[1]++;
                                 CodePageGuestToHostUTF16(uname,text);
                                 if (uname[0]!=0&&uname[1]==0) {
                                     (*draw).chr=uname[0];
@@ -4585,7 +4597,7 @@ void VGA_SetupDrawing(Bitu /*val*/) {
     }
 
     /* clip display end to stay within vtotal ("Monolith" demo part 4 320x570 mode fix) */
-    if (vdend > vtotal) {
+    if (vdend > vtotal && !IS_JEGA_ARCH) {
         LOG(LOG_VGA,LOG_WARN)("VGA display end greater than vtotal!");
         vdend = vtotal;
     }
@@ -5010,7 +5022,6 @@ void VGA_SetupDrawing(Bitu /*val*/) {
         // if char9_set is true, allow 9-pixel wide fonts
 		if (isJEGAEnabled()) { //if Kanji Text Disable is off
 			vga.draw.char9dot = false;
-			height = 480;
 			bpp = 16;
 		}
         if ((vga.seq.clocking_mode&0x01) || !vga.draw.char9_set) {
