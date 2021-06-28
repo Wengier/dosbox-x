@@ -47,6 +47,8 @@
 
 /* ints/bios.cpp */
 void bios_enable_ps2();
+void WriteCharTopView(uint16_t off, int count);
+uint16_t GetTextSeg();
 
 /* hardware/keyboard.cpp */
 void AUX_INT33_Takeover();
@@ -755,6 +757,7 @@ const char* Mouse_GetSelected(int x1, int y1, int x2, int y2, int w, int h, uint
 		r2=t;
 	}
 	text[0]=0;
+    uint16_t seg = IS_DOSV?GetTextSeg():0;
 #if defined(USE_TTF)
     if (ttf.inUse&&isDBCSCP()&&!(c1==0&&c2==ttf.cols-1&&r1==0&&r2==ttf.lins-1)) {
         ttf_cell *curAC = curAttrChar;
@@ -777,9 +780,15 @@ const char* Mouse_GetSelected(int x1, int y1, int x2, int y2, int w, int h, uint
         }
     } else
 #endif
-	if (!IS_DOSV)
 	for (int i=r1; i<=r2; i++) {
-		for (int j=c1; j<=c2; j++) {
+        bool lead1 = false, lead2 = false;
+        if (IS_DOSV) {
+            for (int k=0; k<c1; k++) {
+                if (lead1) lead1=false;
+                else if (isKanji1(real_readb(seg,(i*c+k)*2))) lead1=true;
+            }
+        }
+		for (int j=c1+(lead1?1:0); j<=c2; j++) {
 			if (IS_PC98_ARCH) {
 				uint16_t address=((i*80)+j)*2;
 				PhysPt where = CurMode->pstart+address;
@@ -796,8 +805,15 @@ const char* Mouse_GetSelected(int x1, int y1, int x2, int y2, int w, int h, uint
                     if (!((prevres & 0xFF00u) != 0u && (prevres & 0xFCu) != 0x08u && prevres==result))
                         text[len++]=result;
                 } else
-					text[len++]=result;
-			} else {
+                    text[len++]=result;
+            } else if (IS_DOSV) {
+                if (lead2) lead2=false;
+                else if (isKanji1(real_readb(seg,(i*c+j)*2))) lead2=true;
+                if (j<c2||!lead2) {
+                    result=real_readb(seg,(i*c+j)*2);
+                    text[len++]=result;
+                }
+            } else {
                 if (!isJEGAEnabled()||j>c1||std::find(jtbs.begin(), jtbs.end(), std::make_pair(i,j)) == jtbs.end()) {
                     ReadCharAttr(j,i,page,&result);
                     text[len++]=result;
@@ -847,6 +863,7 @@ void Mouse_Select(int x1, int y1, int x2, int y2, int w, int h, bool select) {
 		r1=r2;
 		r2=t;
 	}
+    uint16_t seg = IS_DOSV?GetTextSeg():0;
 #if defined(USE_TTF)
     if (ttf.inUse&&(!IS_EGAVGA_ARCH||CurMode->mode!=3||isDBCSCP())) {
         ttf_cell *newAC = newAttrChar;
@@ -864,9 +881,12 @@ void Mouse_Select(int x1, int y1, int x2, int y2, int w, int h, bool select) {
 	for (int i=r1; i<=r2; i++)
 		for (int j=c1; j<=c2; j++) {
 			if (IS_PC98_ARCH) {
-				uint16_t address=((i*80)+j)*2;
-				PhysPt where = CurMode->pstart+address;
+				PhysPt where = CurMode->pstart+((i*80)+j)*2;
 				mem_writeb(where+0x2000,mem_readb(where+0x2000)^16);
+			} else if (IS_DOSV) {
+				uint8_t attr = real_readb(seg,(i*c+j)*2+1);
+				real_writeb(seg,(i*c+j)*2+1,attr/0x10+(attr&0xF)*0x10);
+				if (j==c2) WriteCharTopView(c*i*2,j+1);
 			} else
 				real_writeb(0xb800,(i*c+j)*2+1,real_readb(0xb800,(i*c+j)*2+1)^119);
 		}

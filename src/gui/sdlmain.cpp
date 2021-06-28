@@ -74,7 +74,7 @@ bool usesystemcursor = false, enableime = false;
 bool maximize = false, direct_mouse_clipboard=false;
 bool mountfro[26], mountiro[26];
 bool OpenGL_using(void), Direct3D_using(void);
-void GFX_OpenGLRedrawScreen(void), InitFontHandle();
+void GFX_OpenGLRedrawScreen(void), InitFontHandle(), DOSV_FillScreen();
 
 #ifndef _GNU_SOURCE
 # define _GNU_SOURCE
@@ -6543,7 +6543,7 @@ void ClipKeySelect(int sym) {
         }
         return;
     }
-    if (mbutton!=4 || (CurMode->type!=M_TEXT && !IS_PC98_ARCH)) return;
+    if (mbutton!=4 || (CurMode->type!=M_TEXT && !IS_DOSV && !IS_PC98_ARCH)) return;
     if (sym==SDLK_HOME) {
         if (selsrow==-1 || selscol==-1) {
             int p=real_readb(BIOSMEM_SEG,BIOSMEM_CURRENT_PAGE);
@@ -7263,7 +7263,7 @@ bool GFX_IsFullscreen(void) {
 #if defined(WIN32) && !defined(HX_DOS) && !defined(C_SDL2) && defined(SDL_DOSBOX_X_SPECIAL)
 static bool CheckEnableImmOnKey(SDL_KeyboardEvent key)
 {
-	if(key.keysym.sym == 0 || (!SDL_IM_Composition() && (key.keysym.sym == 0x08 || key.keysym.sym == 0x20 || key.keysym.sym == 0x113 || key.keysym.sym == 0x114))) {
+	if(key.keysym.sym == 0 || (!SDL_IM_Composition() && (key.keysym.sym == 0x08 || key.keysym.sym >= 0x20 && key.keysym.sym <= 0x7D || key.keysym.sym == 0x113 || key.keysym.sym == 0x114))) {
 		// BS, <-, ->
 		return true;
 	}
@@ -11112,6 +11112,7 @@ bool clear_menu_callback(DOSBoxMenu * const menu,DOSBoxMenu::item * const menuit
         uint16_t oldax=reg_ax;
         reg_ax=(uint16_t)CurMode->mode;
         CALLBACK_RunRealInt(0x10);
+        if (IS_DOSV && DOSV_CheckCJKVideoMode()) DOSV_FillScreen();
         reg_ax = oldax;
     }
     if (!strcmp(mname, "clear_screen") && !dos_kernel_disabled && !strcmp(RunningProgram, "COMMAND")) {
@@ -13279,7 +13280,7 @@ int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {
     enableime = !strcasecmp(imestr, "true") || !strcasecmp(imestr, "1");
     if (!strcasecmp(imestr, "auto")) {
         const char *machine = section->Get_string("machine");
-        if (!strcasecmp(machine, "pc98") || !strcasecmp(machine, "pc9801") || !strcasecmp(machine, "pc9821") || !strcasecmp(machine, "jega") || strcasecmp(static_cast<Section_prop *>(control->GetSection("dos"))->Get_string("dosv"), "off")) enableime = true;
+        if (!strcasecmp(machine, "pc98") || !strcasecmp(machine, "pc9801") || !strcasecmp(machine, "pc9821") || !strcasecmp(machine, "jega") || strcasecmp(static_cast<Section_prop *>(control->GetSection("dosv"))->Get_string("dosv"), "off")) enableime = true;
         else {
             force_conversion = true;
             int cp=dos.loaded_codepage;

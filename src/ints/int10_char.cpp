@@ -32,7 +32,7 @@
 #include "regs.h"
 #include <string.h>
 
-uint8_t prevchr = 0, pattr = 0;
+uint8_t prevchr = 0;
 uint16_t pcol = 0, prow = 0, pchr = 0;
 bool CheckBoxDrawing(uint8_t c1, uint8_t c2, uint8_t c3, uint8_t c4);
 uint8_t DefaultANSIAttr();
@@ -348,6 +348,11 @@ uint8_t *GetSbcsFont(Bitu code);
 uint8_t *GetSbcs19Font(Bitu code);
 uint8_t *GetDbcsFont(Bitu code);
 
+void DOSV_FillScreen() {
+    BIOS_NCOLS;BIOS_NROWS;
+    for (int i=0; i<nrows; i++) DOSV_Text_FillRow(0,ncols,i,7);
+}
+
 void WriteCharDOSVSbcs(uint16_t col, uint16_t row, uint8_t chr, uint8_t attr) {
 	Bitu off;
 	uint8_t data, select;
@@ -431,18 +436,18 @@ void WriteCharDOSVSbcs(uint16_t col, uint16_t row, uint8_t chr, uint8_t attr) {
 }
 
 void WriteCharDOSVDbcs(uint16_t col, uint16_t row, uint16_t chr, uint8_t attr) {
-	if (IS_DOSV && !IS_JDOSV && col == pcol+2 && row == prow && attr == pattr && CheckBoxDrawing(pchr / 0x100, pchr & 0xFF, chr / 0x100, chr & 0xFF)) {
+	if (IS_DOSV && !IS_JDOSV && col == pcol+2 && row == prow && CheckBoxDrawing(pchr / 0x100, pchr & 0xFF, chr / 0x100, chr & 0xFF)) {
 		WriteCharDOSVSbcs(col - 2, row, pchr / 0x100, attr);
 		WriteCharDOSVSbcs(col - 1, row, pchr & 0xFF, attr);
 		WriteCharDOSVSbcs(col, row, chr / 0x100, attr);
 		WriteCharDOSVSbcs(col + 1, row, chr & 0xFF, attr);
-		pcol = col;prow = row;pchr = chr;pattr = attr;
+		pcol = col;prow = row;pchr = chr;
 		return;
 	}
 	Bitu off;
-	uint16_t data;
-	uint16_t *font;
+	uint8_t *font;
 	uint8_t select;
+	int i = 0;
 
 	if(CheckJapaneseGraphicsMode(attr)) {
 		IO_Write(0x3ce, 0x05); IO_Write(0x3cf, 0x03);
@@ -452,7 +457,7 @@ void WriteCharDOSVDbcs(uint16_t col, uint16_t row, uint16_t chr, uint8_t attr) {
 		volatile uint16_t dummy;
 		Bitu width = real_readw(BIOSMEM_SEG, BIOSMEM_NB_COLS);
 		uint8_t height = real_readb(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT);
-		font = (uint16_t *)GetDbcsFont(chr);
+		font = (uint8_t *)GetDbcsFont(chr);
 		off = row * width * height + col;
 		if(svgaCard == SVGA_TsengET4K) {
 			if(off >= 0x20000) {
@@ -466,14 +471,17 @@ void WriteCharDOSVDbcs(uint16_t col, uint16_t row, uint16_t chr, uint8_t attr) {
 			}
 			IO_Write(0x3cd, select);
 		}
+		i = -1;
 		for(uint8_t h = 0 ; h < height ; h++) {
 			dummy = real_readw(0xa000, off);
 			if(height == 19 && (h == 0 || h > 16)) {
-				data = 0;
+                real_writeb(0xa000, off, 0);
+                real_writeb(0xa000, off+1+(col==width-1?width*height:0), 0);
 			} else {
-				data = *font++;
+                real_writeb(0xa000, off, *(font+2*i));
+                real_writeb(0xa000, off+1+(col==width-1?width*height:0), *(font+2*i+1));
 			}
-			real_writew(0xa000, off, data);
+			i++;
 			off += width;
 		}
 		IO_Write(0x3ce, 0x03); IO_Write(0x3cf, 0x00);
@@ -482,13 +490,13 @@ void WriteCharDOSVDbcs(uint16_t col, uint16_t row, uint16_t chr, uint8_t attr) {
 	volatile uint16_t dummy;
 	Bitu width = real_readw(BIOSMEM_SEG, BIOSMEM_NB_COLS);
 	uint8_t height = real_readb(BIOSMEM_SEG, BIOSMEM_CHAR_HEIGHT);
-	font = (uint16_t *)GetDbcsFont(chr);
+	font = (uint8_t *)GetDbcsFont(chr);
 	off = row * width * height + col;
 	if(svgaCard == SVGA_TsengET4K) {
-		if(off >= 0x20000) {
+		if (off >= 0x20000) {
 			select = 0x22;
 			off -= 0x20000;
-		} else if(off >= 0x10000) {
+		} else if (off >= 0x10000) {
 			select = 0x11;
 			off -= 0x10000;
 		} else {
@@ -500,25 +508,27 @@ void WriteCharDOSVDbcs(uint16_t col, uint16_t row, uint16_t chr, uint8_t attr) {
 	IO_Write(0x3ce, 0x00); IO_Write(0x3cf, attr >> 4);
 	real_writew(0xa000, off, 0xffff); dummy = real_readw(0xa000, off);
 	IO_Write(0x3ce, 0x00); IO_Write(0x3cf, attr & 0x0f);
+	i = -1;
 	for(uint8_t h = 0 ; h < height ; h++) {
-		if(height == 19 && (h == 0 || h > 16)) {
-			data = 0;
+		if (height == 19 && (h == 0 || h > 16)) {
+            real_writeb(0xa000, off, 0);
+            real_writeb(0xa000, off+1+(col==width-1?width*height:0), 0);
 		} else {
-			data = *font++;
+            real_writeb(0xa000, off, *(font+2*i));
+            real_writeb(0xa000, off+1+(col==width-1?width*height:0), *(font+2*i+1));
 		}
-		real_writew(0xa000, off, data);
+		i++;
 		off += width;
 		if(off >= 0x10000) {
-			if(select == 0x00) {
+			if(select == 0x00)
 				select = 0x11;
-			} else if(select == 0x11) {
+			else if(select == 0x11)
 				select = 0x22;
-			}
 			off -= 0x10000;
 			IO_Write(0x3cd, select);
 		}
 	}
-	pcol = col;prow = row;pchr = chr;pattr = attr;
+	pcol = col;prow = row;pchr = chr;
 }
 
 void WriteCharTopView(uint16_t off, int count) {
@@ -1112,7 +1122,7 @@ void WriteChar(uint16_t col,uint16_t row,uint8_t page,uint16_t chr,uint8_t attr,
 			if (isKanji1(chr) && prevchr == 0 && (IS_JDOSV || col < width - 1))
 				prevchr = chr;
 			else if (isKanji2(chr) && prevchr != 0 && (IS_JDOSV || col)) {
-				WriteCharDOSVDbcs(col - 1, row, (prevchr << 8) | chr, attr);
+				WriteCharDOSVDbcs((col?col:cols) - 1, row - (!row||col?0:1), (prevchr << 8) | chr, attr);
 				prevchr = 0;
 				return;
 			} else
