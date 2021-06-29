@@ -1,8 +1,8 @@
 0.83.15
   - Improved the network redirector functions for the
     Windows platform, so that you can for example list,
-    open, write, copy, and execute files in a network
-    path in the form \\COMPUTER\FOLDER directly when
+    open, write, copy, and execute files in UNC network
+    paths in the form \\COMPUTER\FOLDER directly when
     network redirector function is enabled and secure
     mode is disabled on Windows systems. (Wengier)
   - MOUNT command followed by a drive letter only will
@@ -51,6 +51,8 @@
     Turbo (Fast Forward) mode at start. You can also
     change it from the command-line via CONFIG command
     (e.g. "config -set turbo=true"). (Wengier)
+  - Command "CONFIG -L" will now list the global config
+    file for DOSBox-X (if any). (Wengier)
   - Added value "quiet" to "log console" config option
     to only log DOS console outputs. (Wengier)
   - There is now a special DOS function for DOSBox-X at
@@ -102,14 +104,15 @@
   - Added support for inputing DBCS characters using
     system input method (IME) in Windows SDL1 build.
     Chinese (Simplified & Traditional) IME should work
-    with the default setting and a Chinese code page.
-    Japanese IME may require DirectX mode for the SDL1
-    library (set option "videodriver" to "directx" for
-    this). There is a new config option "ime" in the
+    with the default video setting and a Chinese code
+    page or Chinese DOS/V mode. Japanese and Korean IME
+    may require DirectX mode for the SDL1 library (set
+    option "videodriver" to "directx" in [sdl] section
+    for this). There is a new config option "ime" in
     [dosbox] section to control it. When set to "auto"
     (default), it is enabled for Windows SDL1 builds
-    only if DOSBox-X is started with a CJK code page
-    or in PC-98/JEGA/DOS/V mode. (Wengier)
+    only if DOSBox-X is started with a CJK code page or
+    in PC-98, JEGA or DOS/V mode. (Wengier)
   - Added support for Japanese EGA mode (machine=jega)
     by adopting code from DOSVAXJ3. As with DOS/V, you
     can optionally set the SBCS and DBCS fonts with

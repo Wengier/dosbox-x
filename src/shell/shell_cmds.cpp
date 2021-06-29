@@ -1907,7 +1907,15 @@ void DOS_Shell::CMD_DIR(char * args) {
 			}
 		}
 #if defined(WIN32) && !(defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR))
-		if (!Network_IsNetworkResource(args))
+		if (Network_IsNetworkResource(args)) {
+			std::string str = MSG_Get("SHELL_CMD_DIR_BYTES_FREE");
+			std::string::size_type idx = str.rfind(" %");
+			if (idx != std::string::npos) {
+				str = str.substr(0, idx)+"\n"; // No "nnn Bytes free"
+				WriteOut(str.c_str(),dir_count);
+				if (!dirPaused(this, w_size, optP, optW)) {dos.dta(save_dta);return;}
+			}
+		} else
 #endif
 		{
 			FormatNumber(free_space,numformat);
