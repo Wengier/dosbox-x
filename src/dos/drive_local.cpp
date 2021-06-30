@@ -132,7 +132,8 @@ static host_cnv_char_t cpcnv_ltemp[4096];
 static uint16_t ldid[256];
 static std::string ldir[256];
 static std::string hostname = "";
-extern bool rsize, morelen, force_sfn, enable_share_exe, isDBCSCP();
+extern bool rsize, morelen, force_sfn, enable_share_exe;
+extern bool isDBCSCP(), isKanji1(uint8_t chr), shiftjis_lead_byte(int c);
 extern int lfn_filefind_handle, freesizecap, file_access_tries;
 extern unsigned long totalc, freec;
 
@@ -722,6 +723,15 @@ char *CodePageHostToGuestL(const host_cnv_char_t *s) {
         return NULL;
 
     return (char*)cpcnv_ltemp;
+}
+
+int FileDirExist(const char *name) {
+    ht_stat_t st;
+    host_cnv_char_t *host_name = CodePageGuestToHost(name);
+    if (host_name == NULL || ht_stat(host_name, &st)) return 0;
+    if ((st.st_mode & S_IFREG) == S_IFREG) return 1;
+    else if (st.st_mode & S_IFDIR) return 2;
+    return 0;
 }
 
 extern uint16_t fztime, fzdate;
@@ -4947,7 +4957,13 @@ void Overlay_Drive::remove_special_file_from_disk(const char* dosname, const cha
 
 std::string Overlay_Drive::create_filename_of_special_operation(const char* dosname, const char* operation) {
 	std::string res(dosname);
-	std::string::size_type s = res.rfind('\\'); //CHECK DOS or host endings.... on update_cache
+	std::string::size_type s = std::string::npos; //CHECK DOS or host endings.... on update_cache
+	bool lead = false;
+	for (unsigned int i=0; i<res.size(); i++) {
+		if (lead) lead = false;
+		else if ((IS_PC98_ARCH && shiftjis_lead_byte(res[i])) || (isDBCSCP() && isKanji1(res[i]))) lead = true;
+		else if (res[i]=='\\') s = i;
+	}
 	if (s == std::string::npos) s = 0; else s++;
 	std::string oper = special_prefix + "_" + operation + "_";
 	res.insert(s,oper);

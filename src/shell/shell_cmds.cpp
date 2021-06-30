@@ -121,6 +121,7 @@ extern uint16_t countryNo;
 void GetExpandedPath(std::string &path);
 bool Network_IsNetworkResource(const char * filename);
 void DOS_SetCountry(uint16_t countryNo), DOSV_FillScreen();
+extern bool isDBCSCP(), isKanji1(uint8_t chr), shiftjis_lead_byte(int c);
 
 /* support functions */
 static char empty_char = 0;
@@ -851,10 +852,10 @@ static bool doTree(DOS_Shell * shell, char * args, DOS_DTA dta, bool optA, bool 
     if (level&&strlen(sfull)>4&&!strcasecmp(sfull+strlen(sfull)-4, "\\*.*")) {
         *(sfull+strlen(sfull)-4)=0;
         p=strrchr_dbcs(sfull, '\\');
-        char c=optA?(last?'\\':'+'):(last?'À':'Ã');
+        char c=optA?(last?'\\':'+'):(last?0xc0:0xc3);
         cont[level]=!last;
-        for (int i=1; i<level; i++) shell->WriteOut("%c   ", cont[i]?(optA?'|':'³'):' ');
-        shell->WriteOut(optA?"%c---%s\n":"%cÄÄÄ%s\n", c, p?p+1:sfull);
+        for (int i=1; i<level; i++) shell->WriteOut("%c   ", cont[i]?(optA?'|':0xb3):' ');
+        shell->WriteOut(("%c"+std::string(3, optA?'-':0xc4)+"%s\n").c_str(), c, p?p+1:sfull);
         *(sfull+strlen(sfull))='\\';
     }
     sprintf(sargs,"\"%s\"",spath);
@@ -889,7 +890,7 @@ static bool doTree(DOS_Shell * shell, char * args, DOS_DTA dta, bool optA, bool 
                         found=true;
                     }
                 } else if (optF) {
-                    for (int i=1; i<=level; i++) shell->WriteOut("%c   ", (i==1&&level>1?!plast:cont[i])?(optA?'|':'³'):' ');
+                    for (int i=1; i<=level; i++) shell->WriteOut("%c   ", (i==1&&level>1?!plast:cont[i])?(optA?'|':0xb3):' ');
                     shell->WriteOut("    %s\n", uselfn?lname:name);
                 }
             }
@@ -2276,7 +2277,13 @@ void DOS_Shell::CMD_COPY(char * args) {
 						// save the offset in the source names
 
 						replacementOffset = source.filename.find('*');
-						size_t lastSlash = source.filename.rfind('\\');
+						size_t lastSlash = std::string::npos;
+						bool lead = false;
+						for (unsigned int i=0; i<source.filename.size(); i++) {
+							if (lead) lead = false;
+							else if ((IS_PC98_ARCH && shiftjis_lead_byte(source.filename[i])) || (isDBCSCP() && isKanji1(source.filename[i]))) lead = true;
+							else if (source.filename[i]=='\\') lastSlash = i;
+						}
 						if (std::string::npos == lastSlash)
 							lastSlash = 0;
 						else
