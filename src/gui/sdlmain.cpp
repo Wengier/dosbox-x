@@ -7264,7 +7264,7 @@ bool GFX_IsFullscreen(void) {
 #if defined(WIN32) && !defined(HX_DOS) && !defined(C_SDL2) && defined(SDL_DOSBOX_X_SPECIAL)
 static bool CheckEnableImmOnKey(SDL_KeyboardEvent key)
 {
-	if(key.keysym.sym == 0 || (!SDL_IM_Composition() && (key.keysym.sym == 0x08 || key.keysym.sym >= 0x20 && key.keysym.sym <= 0x7D || key.keysym.sym == 0x113 || key.keysym.sym == 0x114))) {
+	if(key.keysym.sym == 0 || (!SDL_IM_Composition() && (key.keysym.sym == 0x08 || key.keysym.sym == 0x09 || key.keysym.sym >= 0x20 && key.keysym.sym <= 0x7F || key.keysym.sym >= 0x111 && key.keysym.sym <= 0x119))) {
 		// BS, <-, ->
 		return true;
 	}
@@ -13166,6 +13166,10 @@ int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {
 				pvars[0].erase(equpos);
 				// As we had a = the first thing must be a property now
 				Section* sec=control->GetSectionFromProperty(pvars[0].c_str());
+				if (!sec&&pvars[0].size()>4&&!strcasecmp(pvars[0].substr(0, 4).c_str(), "ttf.")) {
+					pvars[0].erase(0,4);
+					sec = control->GetSectionFromProperty(pvars[0].c_str());
+				}
 				if (sec) pvars.insert(pvars.begin(),std::string(sec->GetName()));
 				else {
 					LOG_MSG("%s", MSG_Get("PROGRAM_CONFIG_PROPERTY_ERROR"));
