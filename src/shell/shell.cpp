@@ -575,17 +575,22 @@ static char const * const comspec_string="COMSPEC=Z:\\COMMAND.COM";
 static char const * const prompt_string="PROMPT=$P$G";
 static char const * const full_name="Z:\\COMMAND.COM";
 static char const * const init_line="/INIT AUTOEXEC.BAT";
+extern uint8_t ZDRIVE_NUM;
 
+char *str_replace(char *orig, char *rep, char *with);
 void GetExpandedPath(std::string &path) {
-    if (path=="Z:\\"||path=="z:\\")
-        path=path_string+5;
-    else if (path.size()>3&&(path.substr(0, 4)=="Z:\\;"||path.substr(0, 4)=="z:\\;")&&path.substr(4).find("Z:\\")==std::string::npos&&path.substr(4).find("z:\\")==std::string::npos)
-        path=std::string(path_string+5)+path.substr(3);
+    std::string udrive = std::string(1,ZDRIVE_NUM+'A'), ldrive = std::string(1,ZDRIVE_NUM+'a');
+    char pathstr[100];
+    strcpy(pathstr, path_string+5);
+    if (path==udrive+":\\"||path==ldrive+":\\")
+        path=ZDRIVE_NUM==25?pathstr:str_replace(pathstr, "Z:\\", (char *)(udrive+":\\").c_str());
+    else if (path.size()>3&&(path.substr(0, 4)==udrive+":\\;"||path.substr(0, 4)==ldrive+":\\;")&&path.substr(4).find(udrive+":\\")==std::string::npos&&path.substr(4).find(ldrive+":\\")==std::string::npos)
+        path=std::string(ZDRIVE_NUM==25?pathstr:str_replace(pathstr, "Z:\\", (char *)(udrive+":\\").c_str()))+path.substr(3);
     else if (path.size()>3) {
-        size_t pos = path.find(";Z:\\");
-        if (pos == std::string::npos) pos = path.find(";z:\\");
-        if (pos != std::string::npos && (!path.substr(pos+4).size() || path[pos+4]==';'&&path.substr(pos+4).find("Z:\\")==std::string::npos&&path.substr(pos+4).find("z:\\")==std::string::npos))
-            path=path.substr(0, pos+1)+std::string(path_string+5)+path.substr(pos+4);
+        size_t pos = path.find(";"+udrive+":\\");
+        if (pos == std::string::npos) pos = path.find(";"+ldrive+":\\");
+        if (pos != std::string::npos && (!path.substr(pos+4).size() || path[pos+4]==';'&&path.substr(pos+4).find(udrive+":\\")==std::string::npos&&path.substr(pos+4).find(ldrive+":\\")==std::string::npos))
+            path=path.substr(0, pos+1)+std::string(ZDRIVE_NUM==25?pathstr:str_replace(pathstr, "Z:\\", (char *)(udrive+":\\").c_str()))+path.substr(pos+4);
     }
 }
 
@@ -1336,6 +1341,12 @@ void SHELL_Init() {
 			"Note: External commands like \033[33;1mMOUNT\033[0m and \033[33;1mIMGMOUNT\033[0m are not listed by HELP [/A].\n"
 			"      These commands can be found on the Z: drive as programs (e.g. MOUNT.COM).\n"
             "      Type \033[33;1mcommand /?\033[0m or \033[33;1mHELP command\033[0m for help information for that command.\n");
+    MSG_Add("SHELL_CMD_LS_HELP","Lists directory contents.\n");
+    MSG_Add("SHELL_CMD_LS_HELP_LONG","LS [drive:][path][filename] [/A] [/L] [/P] [/Z]\n\n"
+            "  /A     Lists hidden and system files also.\n"
+            "  /L     Lists names one per line.\n"
+            "  /P     Pauses after each screenful of information.\n"
+            "  /Z     Displays short names even if LFN support is available.\n");
 	MSG_Add("SHELL_CMD_MKDIR_HELP","Creates a directory.\n");
 	MSG_Add("SHELL_CMD_MKDIR_HELP_LONG","MKDIR [drive:][path]\n"
 	        "MD [drive:][path]\n");

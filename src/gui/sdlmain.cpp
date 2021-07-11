@@ -7378,14 +7378,9 @@ void SetIMPosition() {
 		nrows=(IS_EGAVGA_ARCH?real_readb(BIOSMEM_SEG,BIOSMEM_NB_ROWS):24)+1;
 		ncols=real_readw(BIOSMEM_SEG,BIOSMEM_NB_COLS);
     }
-    if (dos.loaded_codepage == 936 || dos.loaded_codepage == 950) {
-        if (y>=nrows-1) y=nrows-8;
-        if (x>=ncols-4) x=ncols-4;
-    } else {
-        if (IS_PC98_ARCH && x<ncols-3) x+=2;
-        x--;
-        y--;
-    }
+    if (IS_PC98_ARCH && x<ncols-3) x+=2;
+    x--;
+    y--;
 
 	if ((im_x != x || im_y != y) && GetTicks() - last_ticks > 100) {
 		last_ticks = GetTicks();
@@ -7401,7 +7396,7 @@ void SetIMPosition() {
             SDL_SetIMPosition((x+1) * ttf.pointsize / 2, (y+1) * ttf.pointsize);
         else
 #endif
-        SDL_SetIMPosition((x+1) * width, (y+1) * height - (DOSV_CheckCJKVideoMode()?2:0));
+        SDL_SetIMPosition((x+1) * width, (y+1) * height - (IS_DOSV?-1:(DOSV_CheckCJKVideoMode()?2:0)));
 	}
 }
 #endif
@@ -8178,7 +8173,7 @@ void GFX_Events() {
 				int len;
 				char chars[10];
 				if(len = SDL_FlushIMString(NULL)) {
-					uint16_t *buff = (uint16_t *)malloc((len + 2)), uname[2];
+					uint16_t *buff = (uint16_t *)malloc((len + 1)*sizeof(uint16_t)), uname[2];
 					SDL_FlushIMString(buff);
 					SetIMPosition();
 					for(int no = 0 ; no < len ; no++) {
@@ -8215,7 +8210,7 @@ void GFX_Events() {
 #endif
         default:
 #if defined(WIN32) && !defined(HX_DOS) && defined(SDL_DOSBOX_X_SPECIAL)
-            if(event.key.keysym.scancode == 0x70 || event.key.keysym.scancode == 0x94 || event.key.keysym.scancode == 0x3a) {
+            if(event.key.keysym.scancode == 0x70 || event.key.keysym.scancode == 0x94) {
                 if(event.key.keysym.scancode == 0x94 && dos.im_enable_flag) {
                     break;
                 }
