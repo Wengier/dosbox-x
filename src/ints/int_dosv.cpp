@@ -111,6 +111,7 @@ void ResolvePath(std::string& in);
 void SetIMPosition();
 bool isDBCSCP();
 bool INT10_SetDOSVModeVtext(uint16_t mode, enum DOSV_VTEXT_MODE vtext_mode);
+bool CodePageGuestToHostUTF8(char *d/*CROSS_LEN*/,const char *s/*CROSS_LEN*/);
 bool CodePageGuestToHostUTF16(uint16_t *d/*CROSS_LEN*/,const char *s/*CROSS_LEN*/);
 bool CodePageHostToGuestUTF16(char *d/*CROSS_LEN*/,const uint16_t *s/*CROSS_LEN*/);
 
@@ -271,9 +272,9 @@ static bool CheckEmptyData(uint8_t *data, Bitu length)
 
 bool GetWindowsFont(Bitu code, uint8_t *buff, int width, int height)
 {
-#if defined(LINUX) && C_X11 && !defined(C_SDL2) // Confirmed to work on Linux SDL1 build; seems to not work on Linux SDL2 build
+#if defined(LINUX) && C_X11
 	XRectangle ir, lr;
-	wchar_t text[4];
+	char text[5] = { 0, 0, 0, 0, 0 };
 
 	if(code < 0x100) {
 		if(code == 0x5c && !(IS_DOSV && !IS_JDOSV)) {
@@ -290,28 +291,30 @@ bool GetWindowsFont(Bitu code, uint8_t *buff, int width, int height)
 		src[0] = code >> 8;
 		src[1] = code & 0xff;
 		src[2] = 0;
-		if (!CodePageGuestToHostUTF16((uint16_t *)text,src)) return false;
-		text[0] &= 0xffff;
+		if (!CodePageGuestToHostUTF8(text,src)) return false;
 	}
-	text[1] = ']';
-	text[2] = 0;
+	size_t len = 4;
+	for (int i=4; i>=0; i--) {
+		if (text[i]) break;
+		else len = i;
+	}
 
 	memset(buff, 0, (width / 8) * height);
 
 	if(height == 24) {
 		if(font_set24 == NULL) return false;
-		XwcTextExtents(font_set24, text, 2, &ir, &lr);
+		Xutf8TextExtents(font_set24, text, len, &ir, &lr);
 	} else if(height == 14) {
 		if(font_set14 == NULL) return false;
-		XwcTextExtents(font_set14, text, 2, &ir, &lr);
+		Xutf8TextExtents(font_set14, text, len, &ir, &lr);
 	} else {
 		if(font_set16 == NULL) return false;
-		XwcTextExtents(font_set16, text, 2, &ir, &lr);
+		Xutf8TextExtents(font_set16, text, len, &ir, &lr);
 	}
 	XSetForeground(font_display, font_gc, BlackPixel(font_display, 0));
 	XFillRectangle(font_display, font_pixmap, font_gc, 0, 0, 32, 32);
 	XSetForeground(font_display, font_gc, WhitePixel(font_display, 0));
-	XwcDrawString(font_display, font_pixmap, (height == 16) ? font_set16 : (height == 24) ? font_set24 : font_set14, font_gc, 0, lr.height - (ir.height + ir.y), text, 2);
+	Xutf8DrawString(font_display, font_pixmap, (height == 16) ? font_set16 : (height == 24) ? font_set24 : font_set14, font_gc, 0, lr.height - (ir.height + ir.y), text, len);
 	XImage *image = XGetImage(font_display, font_pixmap, 0, 0, width, lr.height, ~0, XYPixmap);
 	if(image != NULL) {
 		int x, y;
