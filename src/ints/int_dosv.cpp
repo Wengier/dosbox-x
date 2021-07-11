@@ -274,47 +274,56 @@ bool GetWindowsFont(Bitu code, uint8_t *buff, int width, int height)
 {
 #if defined(LINUX) && C_X11
 	XRectangle ir, lr;
+	size_t len;
+	bool useutf8;
+	wchar_t wtext[4];
 	char text[5] = { 0, 0, 0, 0, 0 };
 
 	if(code < 0x100) {
-		if(code == 0x5c && !(IS_DOSV && !IS_JDOSV)) {
-			// yen
-			text[0] = 0xa5;
-		} else if(code >= 0xa1 && code <= 0xdf && !(IS_DOSV && !IS_JDOSV)) {
-			// half kana
-			text[0] = 0xff61 + (code - 0xa1);
-		} else {
-			text[0] = code;
-		}
+		if(code == 0x5c && !(IS_DOSV && !IS_JDOSV)) // yen
+			wtext[0] = 0xa5;
+		else if(code >= 0xa1 && code <= 0xdf && !(IS_DOSV && !IS_JDOSV)) // half kana
+			wtext[0] = 0xff61 + (code - 0xa1);
+		else
+			wtext[0] = code;
+		wtext[1] = ']';
+		wtext[2] = 0;
+		len = 2;
+		useutf8 = false;
 	} else {
 		char src[4];
 		src[0] = code >> 8;
 		src[1] = code & 0xff;
 		src[2] = 0;
 		if (!CodePageGuestToHostUTF8(text,src)) return false;
-	}
-	size_t len = 4;
-	for (int i=4; i>=0; i--) {
-		if (text[i]) break;
-		else len = i;
+		len = 4;
+		for (int i=4; i>=0; i--) {
+			if (text[i]) break;
+			else len = i;
+		}
+		useutf8 = true;
 	}
 
 	memset(buff, 0, (width / 8) * height);
 
 	if(height == 24) {
 		if(font_set24 == NULL) return false;
-		Xutf8TextExtents(font_set24, text, len, &ir, &lr);
+		if(useutf8) Xutf8TextExtents(font_set24, text, len, &ir, &lr);
+		else XwcTextExtents(font_set24, wtext, len, &ir, &lr);
 	} else if(height == 14) {
 		if(font_set14 == NULL) return false;
-		Xutf8TextExtents(font_set14, text, len, &ir, &lr);
+		if(useutf8) Xutf8TextExtents(font_set14, text, len, &ir, &lr);
+		else XwcTextExtents(font_set14, wtext, len, &ir, &lr);
 	} else {
 		if(font_set16 == NULL) return false;
-		Xutf8TextExtents(font_set16, text, len, &ir, &lr);
+		if(useutf8) Xutf8TextExtents(font_set16, text, len, &ir, &lr);
+		else XwcTextExtents(font_set16, wtext, len, &ir, &lr);
 	}
 	XSetForeground(font_display, font_gc, BlackPixel(font_display, 0));
 	XFillRectangle(font_display, font_pixmap, font_gc, 0, 0, 32, 32);
 	XSetForeground(font_display, font_gc, WhitePixel(font_display, 0));
-	Xutf8DrawString(font_display, font_pixmap, (height == 16) ? font_set16 : (height == 24) ? font_set24 : font_set14, font_gc, 0, lr.height - (ir.height + ir.y), text, len);
+	if(useutf8) Xutf8DrawString(font_display, font_pixmap, (height == 16) ? font_set16 : (height == 24) ? font_set24 : font_set14, font_gc, 0, lr.height - (ir.height + ir.y), text, len);
+	else XwcDrawString(font_display, font_pixmap, (height == 16) ? font_set16 : (height == 24) ? font_set24 : font_set14, font_gc, 0, lr.height - (ir.height + ir.y), wtext, len);
 	XImage *image = XGetImage(font_display, font_pixmap, 0, 0, width, lr.height, ~0, XYPixmap);
 	if(image != NULL) {
 		int x, y;
