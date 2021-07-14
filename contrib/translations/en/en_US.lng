@@ -44,6 +44,9 @@ Cancel
 :CLOSE
 Close
 .
+:UPDATE
+Update
+.
 :ADD
 Add
 .
@@ -2347,6 +2350,9 @@ Show FPS and RT speed in title bar
 .
 :MENU:restartconf
 Restart DOSBox-X with config file...
+.
+:MENU:restartlang
+Restart DOSBox-X with language file...
 .
 :MENU:auto_lock_mouse
 Autolock mouse
