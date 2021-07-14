@@ -97,7 +97,6 @@ void GFX_OpenGLRedrawScreen(void), InitFontHandle(), DOSV_FillScreen();
 #include <sys/stat.h>
 #ifdef WIN32
 # include <signal.h>
-# include <sys/stat.h>
 # include <process.h>
 # if !defined(__MINGW32__) /* MinGW does not have these headers */
 #  include <shcore.h>
@@ -12985,10 +12984,15 @@ int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {
             std::string &cfg = control->config_file_list[si];
             if (!control->ParseConfigFile(cfg.c_str())) {
                 // try to load it from the user directory
-                control->ParseConfigFile((config_path + cfg).c_str());
                 if (!control->ParseConfigFile((config_path + cfg).c_str())) {
                     LOG_MSG("CONFIG: Can't open specified config file: %s",cfg.c_str());
+                } else if (control->opt_eraseconf) {
+                    LOG_MSG("Erase config file: %s\n", (config_path + cfg).c_str());
+                    unlink((config_path + cfg).c_str());
                 }
+            } else if (control->opt_eraseconf) {
+                LOG_MSG("Erase config file: %s\n", cfg.c_str());
+                unlink(cfg.c_str());
             }
         }
 
@@ -13013,8 +13017,8 @@ int main(int argc, char* argv[]) SDL_MAIN_NOEXCEPT {
         }
 
         if (control->configfiles.size()) {
-            if (control->opt_eraseconf) {
-                LOG_MSG("Erase mapper file: %s\n", control->configfiles.front().c_str());
+            if (control->opt_eraseconf&&control->config_file_list.empty()) {
+                LOG_MSG("Erase config file: %s\n", control->configfiles.front().c_str());
                 unlink(control->configfiles.front().c_str());
             }
             if (usecfgdir) {
