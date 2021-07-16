@@ -1256,7 +1256,7 @@ skip_shot:
             char fullpath[MAX_PATH];
             if (GetFullPathName(path.c_str(), MAX_PATH, fullpath, NULL)) path = fullpath;
 #elif defined(HAVE_REALPATH)
-            char path[PATH_MAX];
+            char fullpath[PATH_MAX];
             if (realpath(path.c_str(), fullpath) != NULL) path = fullpath;
 #endif
 			LOG_MSG("Started capturing video (FFMPEG) to: %s", path.c_str());
