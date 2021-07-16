@@ -2049,12 +2049,14 @@ void DOSBOX_SetupConfigSections(void) {
 
 	Pstring = secprop->Add_path("fontxdbcs",Property::Changeable::OnlyAtStart,"");
 	Pstring->Set_help("FONTX2 file used to rendering DBCS characters (16x16) in DOS/V or JEGA mode. If not specified, the default one will be used.\n"
-                    "Loading the HZK16 font file (https://github.com/aguegu/BitmapFont/tree/master/font) is also supported for Simplified Chinese DOS/V.");
+                    "For Simplified Chinese DOS/V, loading the HZK16 font file (https://github.com/aguegu/BitmapFont/tree/master/font) is also supported.\n"
+                    "For Traditional Chinese DOS/V, loading the STDFONT.15 font file from the ETen Chinese DOS system is also supported.");
     Pstring->SetBasic(true);
 
 	Pstring = secprop->Add_path("fontxdbcs14",Property::Changeable::OnlyAtStart,"");
 	Pstring->Set_help("FONTX2 file used to rendering SBCS characters (14x14) for the Configuration Tool. If not specified, the default one will be used.\n"
-                    "Loading the HZK14 font file (https://github.com/aguegu/BitmapFont/tree/master/font) is also supported for Simplified Chinese DOS/V.");
+                    "For Simplified Chinese DOS/V, loading the HZK14 font file (https://github.com/aguegu/BitmapFont/tree/master/font) is also supported.\n"
+                    "For Traditional Chinese DOS/V, loading the STDFONT.15 font file from the ETen Chinese DOS system is also supported.");
 
 	Pstring = secprop->Add_path("fontxdbcs24",Property::Changeable::OnlyAtStart,"");
 	Pstring->Set_help("FONTX2 file used to rendering SBCS characters (24x24) in DOS/V mode.");
@@ -2615,7 +2617,9 @@ void DOSBOX_SetupConfigSections(void) {
     Pstring->Set_help("Specifies a TrueType font to use for the TTF output. If not specified, the built-in TrueType font will be used.\n"
                     "Either a font name or full font path can be specified. If file ends with the .TTF extension then the extension can be omitted.\n"
                     "For a font name or relative path, directories such as the working directory and default system font directory will be searched.\n"
-                    "For example, setting it to \"consola\" or \"consola.ttf\" will use the Consola font; similar for other TTF fonts.");
+                    "For example, setting it to \"consola\" or \"consola.ttf\" will use Consola font (included in Windows); similar for other TTF fonts.\n"
+                    "Additionally, OTF fonts (e.g. OratorStd.otf), .FON fonts (e.g. vgasys.fon), and .TTC fonts (e.g. msgothic.ttc) are also supported.\n"
+                    "To display Chinese/Japanese/Korean text in these code pages, a font with CJK characters is needed (e.g. GNU Unifont or Sarasa Gothic).");
     Pstring->SetBasic(true);
 
 	Pstring = secprop->Add_string("fontbold", Property::Changeable::Always, "");
@@ -4493,6 +4497,7 @@ void DOSBOX_SetupConfigSections(void) {
     MSG_Add("CONFIGURATION","Configuration");
     MSG_Add("SETTINGS","Settings");
     MSG_Add("LOGGING_OUTPUT","DOSBox-X logging output");
+    MSG_Add("CODE_OVERVIEW","Code overview");
     MSG_Add("VISIT_HOMEPAGE","Visit Homepage");
     MSG_Add("GET_STARTED","Getting Started");
     MSG_Add("CDROM_SUPPORT","CD-ROM Support");
