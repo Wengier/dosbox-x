@@ -1,4 +1,16 @@
 0.83.16
+  - Reorganized Windows installation to 2 installers
+    installing 32-bit and 64-bit DOSBox-X binaries,
+    for WinXP+ (all) and Vista+ 64-bit respectively,
+    reducing the sizes of installers significantly
+    while adding the SarasaGothicFixed TTF font and
+    existing language translations. (Wengier)
+  - DOSBox-X will now search for more paths (such as
+    user config directory and "languages" subfolder)
+    for loading language files before fail. (Wengier)
+  - DOSBox-X will try to load the SarasaGothicFixed
+    TTF font when no external TTF font is specified
+    and a CJK code page detected at start. (Wengier)
   - HELP command is now an external command appearing
     on Z drive rather than an internal shell command
     (it is never a DOS internal command). (Wengier)
@@ -14,6 +26,10 @@
     logging text" in "Debug" menu to show the overview
     of the current code and the output of DOSBox-X's
     current logging text in debug builds. (Wengier)
+  - Added config option "transparency" in [sdl] section
+    to change the DOSBox-X window transparency (from 0
+    to 90, low to high transparency) on the Linux/macOS
+    SDL2 and Windows platforms. (Wengier)
   - Added config options "pc-98 try font rom" and
     "pc-98 anex86 font" for the PC-98 emulation to
     customize the font file to load. If former option
