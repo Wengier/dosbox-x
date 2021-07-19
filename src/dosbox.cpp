@@ -1054,7 +1054,7 @@ void DOSBOX_RealInit() {
     }
     gbk = dosv_section->Get_bool("gbk");
     dos.loaded_codepage = cp;
-#if defined(WIN32) && !defined(HX_DOS) && !defined(C_SDL2) && defined(SDL_DOSBOX_X_SPECIAL)
+#if (defined(WIN32) || defined(LINUX) && C_X11) && !defined(HX_DOS) && !defined(C_SDL2) && defined(SDL_DOSBOX_X_SPECIAL)
     if (enableime && !control->opt_silent) {
         dos.im_enable_flag = true;
         SDL_SetIMValues(SDL_IM_ENABLE, 1, NULL);

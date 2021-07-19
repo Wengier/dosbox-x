@@ -7375,7 +7375,7 @@ void* GetSetSDLValue(int isget, std::string& target, void* setval) {
     return NULL;
 }
 
-#if defined(WIN32) && !defined(HX_DOS) && !defined(C_SDL2) && defined(SDL_DOSBOX_X_SPECIAL)
+#if (defined(WIN32) || defined(LINUX) && C_X11) && !defined(HX_DOS) && !defined(C_SDL2) && defined(SDL_DOSBOX_X_SPECIAL)
 static Bitu im_x, im_y;
 static uint32_t last_ticks;
 void SetIMPosition() {
@@ -8153,6 +8153,26 @@ void GFX_Events() {
             if (event.key.keysym.sym==SDLK_RCTRL) sdl.rctrlstate = event.key.type;
             if (event.key.keysym.sym==SDLK_LSHIFT) sdl.lshiftstate = event.key.type;
             if (event.key.keysym.sym==SDLK_RSHIFT) sdl.rshiftstate = event.key.type;
+#if defined(LINUX) && C_X11
+			if (event.type == SDL_KEYDOWN) {
+				if(event.key.keysym.unicode != 0) {
+                    char chars[10];
+                    uint16_t uname[2];
+                    uname[0]=event.key.keysym.unicode;
+                    uname[1]=0;
+                    if (CodePageHostToGuestUTF16(chars, uname)) {
+                        for (size_t i=0; i<strlen(chars); i++) {
+                            if (dos.loaded_codepage == 932 && strlen(chars) == 2 && isKanji1(chars[0]))
+                                BIOS_AddKeyToBuffer((i==0?0xf100:0xf000) | (unsigned char)chars[i]);
+                            else
+                                BIOS_AddKeyToBuffer((unsigned char)chars[i]);
+                        }
+                    } else
+                        BIOS_AddKeyToBuffer((unsigned char)uname[0]);
+                }
+                break;
+			}
+#endif
 #if defined(WIN32)
             if (event.type == SDL_KEYDOWN && isModifierApplied())
                 ClipKeySelect(event.key.keysym.sym);
@@ -15043,7 +15063,7 @@ fresh_boot:
 
     sticky_keys(true); //Might not be needed if the shutdown function switches to windowed mode, but it doesn't hurt
 
-#if defined(WIN32) && !defined(HX_DOS) && !defined(C_SDL2) && defined(SDL_DOSBOX_X_SPECIAL)
+#if (defined(WIN32) || defined(LINUX) && C_X11) && !defined(HX_DOS) && !defined(C_SDL2) && defined(SDL_DOSBOX_X_SPECIAL)
     if (!control->opt_silent) {
         SDL_SetIMValues(SDL_IM_ONOFF, 0, NULL);
         SDL_SetIMValues(SDL_IM_ENABLE, 0, NULL);
